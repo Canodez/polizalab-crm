@@ -1,36 +1,89 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PolizaLab MVP
+
+PolizaLab es un asistente diario mobile-first para agentes de seguros principiantes en México. El sistema permite subir pólizas en múltiples formatos, extraer datos automáticamente usando AWS Textract, y gestionar renovaciones próximas.
+
+## Tech Stack
+
+- **Frontend**: React 18 + Next.js 14 (App Router), TypeScript, Tailwind CSS
+- **Backend**: AWS Lambda (Node.js 18), API Gateway, DynamoDB, S3, Textract, Cognito
+- **Testing**: Jest, React Testing Library, fast-check (property-based testing)
+
+## Project Structure
+
+```
+├── app/              # Next.js app router pages
+├── components/       # React components
+├── lib/              # Utility functions and helpers
+├── types/            # TypeScript type definitions
+├── .kiro/specs/      # Project specifications and design docs
+└── public/           # Static assets
+```
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+ and npm
+- AWS Account with configured services (see AWS Setup Guide)
+
+### Installation
+
+1. Clone the repository
+2. Install dependencies:
+
+```bash
+npm install
+```
+
+3. Copy `.env.example` to `.env.local` and fill in your AWS credentials:
+
+```bash
+cp .env.example .env.local
+```
+
+4. Run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to view the app.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Available Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm start` - Start production server
+- `npm run lint` - Run ESLint
+- `npm test` - Run tests
+- `npm run test:watch` - Run tests in watch mode
+- `npm run test:coverage` - Run tests with coverage
+- `npm run format` - Format code with Prettier
+- `npm run format:check` - Check code formatting
 
-## Learn More
+## AWS Setup
 
-To learn more about Next.js, take a look at the following resources:
+Refer to `.kiro/specs/polizalab-mvp/tasks.md` Task 2 for detailed AWS infrastructure setup instructions.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Testing
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The project uses a dual testing approach:
 
-## Deploy on Vercel
+- **Unit Tests**: Specific examples and edge cases
+- **Property-Based Tests**: Universal properties across all inputs (100+ iterations)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Run tests with:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm test
+```
+
+## Documentation
+
+- [Requirements](.kiro/specs/polizalab-mvp/requirements.md)
+- [Design Document](.kiro/specs/polizalab-mvp/design.md)
+- [Implementation Tasks](.kiro/specs/polizalab-mvp/tasks.md)
+
+## License
+
+Private - All rights reserved
