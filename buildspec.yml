@@ -1,0 +1,40 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo "Installing dependencies..."
+      - npm ci
+      
+  build:
+    commands:
+      - echo "Building Next.js static export..."
+      - npm run build
+      - echo "Build completed on $(date)"
+      
+  post_build:
+    commands:
+      - echo "Deploying to S3..."
+      - |
+        aws s3 sync out/ s3://${FRONTEND_BUCKET_NAME}/ \
+          --delete \
+          --cache-control "public, max-age=31536000, immutable" \
+          --exclude "*.html" \
+          --exclude "*.json"
+      - |
+        aws s3 sync out/ s3://${FRONTEND_BUCKET_NAME}/ \
+          --cache-control "public, max-age=0, must-revalidate" \
+          --exclude "*" \
+          --include "*.html" \
+          --include "*.json"
+      - echo "Creating CloudFront invalidation..."
+      - |
+        aws cloudfront create-invalidation \
+          --distribution-id ${CLOUDFRONT_DISTRIBUTION_ID} \
+          --paths "/*"
+      - echo "Deployment completed successfully!"
+
+artifacts:
+  files:
+    - '**/*'
+  base-directory: out

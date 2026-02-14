@@ -1,0 +1,7 @@
+{
+  "Name": "oac-polizalab-crm-frontend",
+  "Description": "OAC for polizalab-crm-frontend",
+  "SigningProtocol": "sigv4",
+  "SigningBehavior": "always",
+  "OriginAccessControlOriginType": "s3"
+}
