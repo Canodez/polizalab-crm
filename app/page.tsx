@@ -3,6 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { isAuthenticated } from '@/lib/auth';
+import { 
+  ClipboardDocumentListIcon, 
+  UsersIcon, 
+  ChartBarIcon 
+} from '@heroicons/react/24/outline';
 
 export default function Home() {
   const router = useRouter();
@@ -50,7 +55,7 @@ export default function Home() {
           {/* Features */}
           <div className="grid md:grid-cols-3 gap-8 my-16">
             <div className="bg-white rounded-lg shadow-md p-6">
-              <div className="text-4xl mb-4">📋</div>
+              <ClipboardDocumentListIcon className="w-12 h-12 text-blue-600 mb-4 mx-auto" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
                 Gestión de Pólizas
               </h3>
@@ -60,7 +65,7 @@ export default function Home() {
             </div>
 
             <div className="bg-white rounded-lg shadow-md p-6">
-              <div className="text-4xl mb-4">👥</div>
+              <UsersIcon className="w-12 h-12 text-blue-600 mb-4 mx-auto" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
                 Gestión de Clientes
               </h3>
@@ -70,7 +75,7 @@ export default function Home() {
             </div>
 
             <div className="bg-white rounded-lg shadow-md p-6">
-              <div className="text-4xl mb-4">📊</div>
+              <ChartBarIcon className="w-12 h-12 text-blue-600 mb-4 mx-auto" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
                 Reportes y Análisis
               </h3>
