@@ -61,7 +61,7 @@ export default function RegisterPage() {
       await registerUser(email, password);
       
       // Redirect to login page after successful registration
-      router.push('/login.html?registered=true');
+      router.push('/login?registered=true');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al registrar usuario');
     } finally {
@@ -187,7 +187,7 @@ export default function RegisterPage() {
             <p className="text-sm text-gray-600">
               ¿Ya tienes cuenta?{' '}
               <a
-                href="/login.html"
+                href="/login"
                 className="text-blue-600 hover:text-blue-700 font-medium"
               >
                 Inicia sesión
