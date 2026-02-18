@@ -127,7 +127,7 @@ This implementation plan breaks down the PolizaLab MVP into discrete coding task
     - Test image upload preview
     - _Requirements: 2.1, 2.2, 2.3_
 
-- [~] 7. Checkpoint - Ensure authentication and profile work end-to-end
+- [ ] 7. Checkpoint - Ensure authentication and profile work end-to-end
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 8. Implement policy backend APIs
@@ -186,7 +186,7 @@ This implementation plan breaks down the PolizaLab MVP into discrete coding task
     - **Validates: Requirements 12.1, 12.6**
 
 - [ ] 9. Implement renewal calculation utilities
-  - [~] 9.1 Create calculateRenewalDate function
+  - [ ] 9.1 Create calculateRenewalDate function
     - Implement 12-month calculation for Auto, GMM, Hogar, Vida temporal
     - Return null for Vida permanente
     - Handle null/invalid inputs gracefully
@@ -201,7 +201,7 @@ This implementation plan breaks down the PolizaLab MVP into discrete coding task
     - **Property 20: Permanent life policy renewal**
     - **Validates: Requirements 6.5, 6.7**
   
-  - [~] 9.4 Create calculateRenewalStatus function
+  - [ ] 9.4 Create calculateRenewalStatus function
     - Calculate days until renewal
     - Return OVERDUE, 30_DAYS, 60_DAYS, 90_DAYS, or NOT_URGENT
     - Handle null fechaRenovacion
@@ -218,21 +218,21 @@ This implementation plan breaks down the PolizaLab MVP into discrete coding task
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 7.1, 7.2, 7.3, 7.4, 7.5_
 
 - [ ] 10. Implement document processing Lambda
-  - [~] 10.1 Create Document Processor Lambda function
+  - [ ] 10.1 Create Document Processor Lambda function
     - Set up S3 event trigger handler
     - Extract userId and generate policyId from S3 key
     - Invoke AWS Textract AnalyzeDocument API
     - Extract raw text from Textract response
     - _Requirements: 3.3, 4.1, 13.4_
   
-  - [~] 10.2 Implement text parsing logic
+  - [ ] 10.2 Implement text parsing logic
     - Create regex patterns for common fields (numeroPoliza, aseguradora, nombre, edad, dates)
     - Implement keyword matching for tipoPoliza detection
     - Normalize extracted values (trim whitespace, format dates)
     - Handle missing fields gracefully (store null)
     - _Requirements: 4.2, 4.7_
   
-  - [~] 10.3 Implement policy record creation
+  - [ ] 10.3 Implement policy record creation
     - Calculate fechaRenovacion using calculateRenewalDate
     - Calculate initial renewalStatus
     - Create policy record in DynamoDB with all fields
@@ -255,7 +255,7 @@ This implementation plan breaks down the PolizaLab MVP into discrete coding task
     - _Requirements: 4.2, 4.7_
 
 - [ ] 11. Implement policy upload UI
-  - [~] 11.1 Create policy upload component
+  - [ ] 11.1 Create policy upload component
     - Build file picker for supported formats
     - Implement file validation (type and size)
     - Request pre-signed URL from API
@@ -276,14 +276,14 @@ This implementation plan breaks down the PolizaLab MVP into discrete coding task
     - _Requirements: 3.1, 3.4, 3.5_
 
 - [ ] 12. Implement home screen
-  - [~] 12.1 Create home screen layout component
+  - [ ] 12.1 Create home screen layout component
     - Implement mobile-first responsive design
     - Create sections for renewals and recent policies
     - Add prominent "Subir póliza" button
     - Use Tailwind CSS for styling
     - _Requirements: 10.1, 10.5, 10.7_
   
-  - [~] 12.2 Create upcoming renewals section
+  - [ ] 12.2 Create upcoming renewals section
     - Fetch renewals from GET /policies/renewals
     - Display grouped by status (30, 60, 90 días)
     - Show clienteNombre, clienteApellido, tipoPoliza, aseguradora, fechaRenovacion
@@ -291,7 +291,7 @@ This implementation plan breaks down the PolizaLab MVP into discrete coding task
     - Make items tappable to navigate to detail
     - _Requirements: 8.2, 8.3, 8.4, 8.5, 8.6_
   
-  - [~] 12.3 Create recent policies section
+  - [ ] 12.3 Create recent policies section
     - Fetch policies from GET /policies
     - Display 10 most recent policies
     - Show clienteNombre, clienteApellido, tipoPoliza, createdAt
@@ -314,14 +314,14 @@ This implementation plan breaks down the PolizaLab MVP into discrete coding task
     - _Requirements: 8.6, 9.5_
 
 - [ ] 13. Implement policy detail and edit UI
-  - [~] 13.1 Create policy detail page component
+  - [ ] 13.1 Create policy detail page component
     - Fetch policy data from GET /policies/:id
     - Display all policy fields in read-only mode
     - Add "Edit" button to switch to edit mode
     - Handle 403 errors (unauthorized access)
     - _Requirements: 5.1, 12.3_
   
-  - [~] 13.2 Create policy edit form component
+  - [ ] 13.2 Create policy edit form component
     - Build form with all editable fields
     - Pre-populate with current values
     - Implement field validation
@@ -344,11 +344,11 @@ This implementation plan breaks down the PolizaLab MVP into discrete coding task
     - Test save errors
     - _Requirements: 5.2, 5.3_
 
-- [~] 14. Checkpoint - Ensure core policy flow works end-to-end
+- [ ] 14. Checkpoint - Ensure core policy flow works end-to-end
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 15. Implement PWA capabilities
-  - [~] 15.1 Create web app manifest
+  - [ ] 15.1 Create web app manifest
     - Define app name, short_name, description
     - Add app icons (192x192, 512x512)
     - Set theme_color and background_color
@@ -356,7 +356,7 @@ This implementation plan breaks down the PolizaLab MVP into discrete coding task
     - Set start_url to "/"
     - _Requirements: 11.1, 11.4, 11.6_
   
-  - [~] 15.2 Implement service worker
+  - [ ] 15.2 Implement service worker
     - Use next-pwa or Workbox
     - Cache critical assets (HTML, CSS, JS)
     - Implement cache-first strategy for static assets
@@ -374,7 +374,7 @@ This implementation plan breaks down the PolizaLab MVP into discrete coding task
     - _Requirements: 11.1, 11.2_
 
 - [ ] 16. Implement mobile-first responsive design
-  - [~] 16.1 Apply mobile-first styling to all components
+  - [ ] 16.1 Apply mobile-first styling to all components
     - Use Tailwind CSS responsive utilities
     - Ensure buttons are minimum 44x44 pixels
     - Add ample spacing between interactive elements
@@ -386,7 +386,7 @@ This implementation plan breaks down the PolizaLab MVP into discrete coding task
     - **Property 34: Responsive mobile layout**
     - **Validates: Requirements 10.7**
   
-  - [~] 16.3 Implement minimalist design system
+  - [ ] 16.3 Implement minimalist design system
     - Define color palette (primary, secondary, neutral)
     - Define typography scale
     - Create reusable button components
@@ -395,19 +395,19 @@ This implementation plan breaks down the PolizaLab MVP into discrete coding task
     - _Requirements: 10.4_
 
 - [ ] 17. Add error handling and loading states
-  - [~] 17.1 Create error boundary component
+  - [ ] 17.1 Create error boundary component
     - Catch React errors
     - Display user-friendly error messages
     - Log errors for debugging
     - _Requirements: All (error handling)_
   
-  - [~] 17.2 Add loading states to all async operations
+  - [ ] 17.2 Add loading states to all async operations
     - Show spinners during API calls
     - Show skeleton screens for data loading
     - Disable buttons during submission
     - _Requirements: All (UX)_
   
-  - [~] 17.3 Implement error toast notifications
+  - [ ] 17.3 Implement error toast notifications
     - Create toast component for error messages
     - Display network errors
     - Display validation errors
@@ -415,7 +415,7 @@ This implementation plan breaks down the PolizaLab MVP into discrete coding task
     - _Requirements: All (error handling)_
 
 - [ ] 18. Add data validation utilities
-  - [~] 18.1 Create validation functions
+  - [ ] 18.1 Create validation functions
     - Implement email validation
     - Implement date format validation (YYYY-MM-DD)
     - Implement age validation (18-100)
@@ -431,14 +431,14 @@ This implementation plan breaks down the PolizaLab MVP into discrete coding task
     - **Validates: Requirements 13.6, 14.5**
 
 - [ ] 19. Integration and final wiring
-  - [~] 19.1 Connect all components with routing
+  - [ ] 19.1 Connect all components with routing
     - Set up Next.js App Router routes
     - Implement protected routes (require authentication)
     - Add navigation between pages
     - Handle 404 pages
     - _Requirements: All_
   
-  - [~] 19.2 Configure environment variables
+  - [ ] 19.2 Configure environment variables
     - Set up .env.local for development
     - Document all required environment variables
     - Add Cognito User Pool ID and Client ID
@@ -447,7 +447,7 @@ This implementation plan breaks down the PolizaLab MVP into discrete coding task
     - Add AWS region
     - _Requirements: All_
   
-  - [~] 19.3 Add API client configuration
+  - [ ] 19.3 Add API client configuration
     - Create centralized API client with base URL
     - Add request interceptor for auth tokens
     - Add response interceptor for error handling
@@ -460,7 +460,7 @@ This implementation plan breaks down the PolizaLab MVP into discrete coding task
     - Test complete policy edit flow
     - _Requirements: 1.1, 3.2, 5.3_
 
-- [~] 20. Final checkpoint - Ensure all tests pass and app is functional
+- [ ] 20. Final checkpoint - Ensure all tests pass and app is functional
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

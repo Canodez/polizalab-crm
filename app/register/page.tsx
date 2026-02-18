@@ -61,7 +61,7 @@ export default function RegisterPage() {
       await registerUser(email, password);
       
       // Redirect to login page after successful registration
-      router.push('/login?registered=true');
+      router.push('/login.html?registered=true');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al registrar usuario');
     } finally {
@@ -94,7 +94,7 @@ export default function RegisterPage() {
                   setEmail(e.target.value);
                   setValidationErrors((prev) => ({ ...prev, email: undefined }));
                 }}
-                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                className={`w-full px-4 py-3 border rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                   validationErrors.email ? 'border-red-500' : 'border-gray-300'
                 }`}
                 placeholder="tu@email.com"
@@ -122,7 +122,7 @@ export default function RegisterPage() {
                   setPassword(e.target.value);
                   setValidationErrors((prev) => ({ ...prev, password: undefined }));
                 }}
-                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                className={`w-full px-4 py-3 border rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                   validationErrors.password ? 'border-red-500' : 'border-gray-300'
                 }`}
                 placeholder="Mínimo 8 caracteres"
@@ -150,7 +150,7 @@ export default function RegisterPage() {
                   setConfirmPassword(e.target.value);
                   setValidationErrors((prev) => ({ ...prev, confirmPassword: undefined }));
                 }}
-                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                className={`w-full px-4 py-3 border rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                   validationErrors.confirmPassword ? 'border-red-500' : 'border-gray-300'
                 }`}
                 placeholder="Confirma tu contraseña"
@@ -187,7 +187,7 @@ export default function RegisterPage() {
             <p className="text-sm text-gray-600">
               ¿Ya tienes cuenta?{' '}
               <a
-                href="/login"
+                href="/login.html"
                 className="text-blue-600 hover:text-blue-700 font-medium"
               >
                 Inicia sesión

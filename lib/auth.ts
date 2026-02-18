@@ -1,38 +1,11 @@
 import {
-  CognitoIdentityProviderClient,
-  SignUpCommand,
-  InitiateAuthCommand,
-  GetUserCommand,
-  GlobalSignOutCommand,
-  AuthFlowType,
-} from '@aws-sdk/client-cognito-identity-provider';
-
-// Environment variables for Cognito configuration
-const COGNITO_REGION = process.env.NEXT_PUBLIC_COGNITO_REGION || 'us-east-1';
-const COGNITO_USER_POOL_ID = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || '';
-const COGNITO_CLIENT_ID = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || '';
-
-// Initialize Cognito client
-const cognitoClient = new CognitoIdentityProviderClient({
-  region: COGNITO_REGION,
-});
-
-// Token storage keys
-const TOKEN_STORAGE_KEYS = {
-  ACCESS_TOKEN: 'polizalab_access_token',
-  ID_TOKEN: 'polizalab_id_token',
-  REFRESH_TOKEN: 'polizalab_refresh_token',
-  USER_EMAIL: 'polizalab_user_email',
-} as const;
-
-/**
- * Authentication tokens returned from Cognito
- */
-export interface AuthTokens {
-  accessToken: string;
-  idToken: string;
-  refreshToken: string;
-}
+  signUp,
+  signIn,
+  signOut,
+  getCurrentUser as amplifyGetCurrentUser,
+  fetchAuthSession,
+  fetchUserAttributes,
+} from 'aws-amplify/auth';
 
 /**
  * Current user information
@@ -55,43 +28,37 @@ export async function registerUser(
   password: string
 ): Promise<{ userId: string; email: string }> {
   try {
-    const command = new SignUpCommand({
-      ClientId: COGNITO_CLIENT_ID,
-      Username: email,
-      Password: password,
-      UserAttributes: [
-        {
-          Name: 'email',
-          Value: email,
+    const { userId } = await signUp({
+      username: email,
+      password,
+      options: {
+        userAttributes: {
+          email,
         },
-      ],
+        autoSignIn: false,
+      },
     });
 
-    const response = await cognitoClient.send(command);
-
-    if (!response.UserSub) {
+    if (!userId) {
       throw new Error('Registration failed: No user ID returned');
     }
 
     return {
-      userId: response.UserSub,
+      userId,
       email,
     };
-  } catch (error) {
-    if (error instanceof Error) {
-      // Handle specific Cognito errors
-      if (error.name === 'UsernameExistsException') {
-        throw new Error('An account with this email already exists');
-      }
-      if (error.name === 'InvalidPasswordException') {
-        throw new Error('Password does not meet requirements');
-      }
-      if (error.name === 'InvalidParameterException') {
-        throw new Error('Invalid email or password format');
-      }
-      throw new Error(`Registration failed: ${error.message}`);
+  } catch (error: any) {
+    // Handle specific Cognito errors
+    if (error.name === 'UsernameExistsException') {
+      throw new Error('An account with this email already exists');
     }
-    throw new Error('Registration failed: Unknown error');
+    if (error.name === 'InvalidPasswordException') {
+      throw new Error('Password does not meet requirements');
+    }
+    if (error.name === 'InvalidParameterException') {
+      throw new Error('Invalid email or password format');
+    }
+    throw new Error(`Registration failed: ${error.message || 'Unknown error'}`);
   }
 }
 
@@ -99,58 +66,31 @@ export async function registerUser(
  * Login user with email and password
  * @param email - User email address
  * @param password - User password
- * @returns Promise with authentication tokens
+ * @returns Promise that resolves when login is successful
  * @throws Error if login fails
  */
-export async function loginUser(
-  email: string,
-  password: string
-): Promise<AuthTokens> {
+export async function loginUser(email: string, password: string): Promise<void> {
   try {
-    const command = new InitiateAuthCommand({
-      AuthFlow: AuthFlowType.USER_PASSWORD_AUTH,
-      ClientId: COGNITO_CLIENT_ID,
-      AuthParameters: {
-        USERNAME: email,
-        PASSWORD: password,
-      },
+    const { isSignedIn } = await signIn({
+      username: email,
+      password,
     });
 
-    const response = await cognitoClient.send(command);
-
-    if (
-      !response.AuthenticationResult?.AccessToken ||
-      !response.AuthenticationResult?.IdToken ||
-      !response.AuthenticationResult?.RefreshToken
-    ) {
-      throw new Error('Login failed: Invalid response from authentication service');
+    if (!isSignedIn) {
+      throw new Error('Login failed: User not signed in');
     }
-
-    const tokens: AuthTokens = {
-      accessToken: response.AuthenticationResult.AccessToken,
-      idToken: response.AuthenticationResult.IdToken,
-      refreshToken: response.AuthenticationResult.RefreshToken,
-    };
-
-    // Store tokens securely
-    storeTokens(tokens, email);
-
-    return tokens;
-  } catch (error) {
-    if (error instanceof Error) {
-      // Handle specific Cognito errors
-      if (error.name === 'NotAuthorizedException') {
-        throw new Error('Invalid email or password');
-      }
-      if (error.name === 'UserNotFoundException') {
-        throw new Error('Invalid email or password');
-      }
-      if (error.name === 'UserNotConfirmedException') {
-        throw new Error('Please verify your email before logging in');
-      }
-      throw new Error(`Login failed: ${error.message}`);
+  } catch (error: any) {
+    // Handle specific Cognito errors
+    if (error.name === 'NotAuthorizedException') {
+      throw new Error('Invalid email or password');
     }
-    throw new Error('Login failed: Unknown error');
+    if (error.name === 'UserNotFoundException') {
+      throw new Error('Invalid email or password');
+    }
+    if (error.name === 'UserNotConfirmedException') {
+      throw new Error('Please verify your email before logging in');
+    }
+    throw new Error(`Login failed: ${error.message || 'Unknown error'}`);
   }
 }
 
@@ -160,31 +100,9 @@ export async function loginUser(
  */
 export async function logoutUser(): Promise<void> {
   try {
-    const accessToken = getStoredAccessToken();
-
-    if (accessToken) {
-      // Sign out from Cognito (invalidates all tokens)
-      const command = new GlobalSignOutCommand({
-        AccessToken: accessToken,
-      });
-
-      try {
-        await cognitoClient.send(command);
-      } catch (error) {
-        // Continue with local cleanup even if Cognito signout fails
-        console.error('Cognito signout failed:', error);
-      }
-    }
-
-    // Clear all stored tokens
-    clearTokens();
-  } catch (error) {
-    // Always clear local tokens even if Cognito call fails
-    clearTokens();
-    if (error instanceof Error) {
-      throw new Error(`Logout failed: ${error.message}`);
-    }
-    throw new Error('Logout failed: Unknown error');
+    await signOut();
+  } catch (error: any) {
+    throw new Error(`Logout failed: ${error.message || 'Unknown error'}`);
   }
 }
 
@@ -195,107 +113,61 @@ export async function logoutUser(): Promise<void> {
  */
 export async function getCurrentUser(): Promise<CurrentUser> {
   try {
-    const accessToken = getStoredAccessToken();
+    await amplifyGetCurrentUser();
+    const attributes = await fetchUserAttributes();
 
-    if (!accessToken) {
-      throw new Error('Not authenticated');
-    }
-
-    const command = new GetUserCommand({
-      AccessToken: accessToken,
-    });
-
-    const response = await cognitoClient.send(command);
-
-    if (!response.Username || !response.UserAttributes) {
-      throw new Error('Failed to retrieve user information');
-    }
-
-    // Extract user attributes
-    const emailAttr = response.UserAttributes.find((attr) => attr.Name === 'email');
-    const emailVerifiedAttr = response.UserAttributes.find(
-      (attr) => attr.Name === 'email_verified'
-    );
-    const subAttr = response.UserAttributes.find((attr) => attr.Name === 'sub');
-
-    if (!emailAttr?.Value || !subAttr?.Value) {
+    if (!attributes.email || !attributes.sub) {
       throw new Error('Missing required user attributes');
     }
 
     return {
-      userId: subAttr.Value,
-      email: emailAttr.Value,
-      emailVerified: emailVerifiedAttr?.Value === 'true',
+      userId: attributes.sub,
+      email: attributes.email,
+      emailVerified: attributes.email_verified === 'true',
     };
-  } catch (error) {
-    if (error instanceof Error) {
-      if (error.name === 'NotAuthorizedException') {
-        // Token expired or invalid - clear stored tokens
-        clearTokens();
-        throw new Error('Session expired. Please login again.');
-      }
-      throw new Error(`Failed to get current user: ${error.message}`);
+  } catch (error: any) {
+    if (error.name === 'UserUnAuthenticatedException') {
+      throw new Error('Not authenticated');
     }
-    throw new Error('Failed to get current user: Unknown error');
+    throw new Error(`Failed to get current user: ${error.message || 'Unknown error'}`);
   }
 }
 
 /**
  * Check if user is currently authenticated
- * @returns true if user has valid tokens stored
+ * @returns true if user is authenticated
  */
-export function isAuthenticated(): boolean {
-  return !!getStoredAccessToken();
+export async function isAuthenticated(): Promise<boolean> {
+  try {
+    await amplifyGetCurrentUser();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
- * Get stored access token
- * @returns Access token or null if not found
+ * Get current access token
+ * @returns Access token or null if not authenticated
  */
-export function getStoredAccessToken(): string | null {
-  if (typeof window === 'undefined') {
+export async function getAccessToken(): Promise<string | null> {
+  try {
+    const session = await fetchAuthSession();
+    return session.tokens?.accessToken?.toString() || null;
+  } catch {
     return null;
   }
-  return localStorage.getItem(TOKEN_STORAGE_KEYS.ACCESS_TOKEN);
 }
 
 /**
- * Get stored ID token
- * @returns ID token or null if not found
+ * Get current ID token
+ * @returns ID token or null if not authenticated
  */
-export function getStoredIdToken(): string | null {
-  if (typeof window === 'undefined') {
+export async function getIdToken(): Promise<string | null> {
+  try {
+    const session = await fetchAuthSession();
+    return session.tokens?.idToken?.toString() || null;
+  } catch {
     return null;
   }
-  return localStorage.getItem(TOKEN_STORAGE_KEYS.ID_TOKEN);
-}
-
-/**
- * Store authentication tokens securely
- * Note: For MVP, using localStorage. In production, consider httpOnly cookies
- * or more secure storage mechanisms.
- */
-function storeTokens(tokens: AuthTokens, email: string): void {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  localStorage.setItem(TOKEN_STORAGE_KEYS.ACCESS_TOKEN, tokens.accessToken);
-  localStorage.setItem(TOKEN_STORAGE_KEYS.ID_TOKEN, tokens.idToken);
-  localStorage.setItem(TOKEN_STORAGE_KEYS.REFRESH_TOKEN, tokens.refreshToken);
-  localStorage.setItem(TOKEN_STORAGE_KEYS.USER_EMAIL, email);
-}
-
-/**
- * Clear all stored authentication tokens
- */
-function clearTokens(): void {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  localStorage.removeItem(TOKEN_STORAGE_KEYS.ACCESS_TOKEN);
-  localStorage.removeItem(TOKEN_STORAGE_KEYS.ID_TOKEN);
-  localStorage.removeItem(TOKEN_STORAGE_KEYS.REFRESH_TOKEN);
-  localStorage.removeItem(TOKEN_STORAGE_KEYS.USER_EMAIL);
 }

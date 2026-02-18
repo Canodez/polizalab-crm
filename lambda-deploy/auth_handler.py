@@ -17,12 +17,22 @@ def lambda_handler(event, context):
     """Main Lambda handler"""
     print(f"Auth Handler invoked: {json.dumps(event)}")
     
-    # CORS headers
+    # CORS headers - Allow both CloudFront and custom domain
+    origin = event.get('headers', {}).get('origin', '')
+    allowed_origins = [
+        'https://d4srl7zbv9blh.cloudfront.net',
+        'https://crm.antesdefirmar.org'
+    ]
+    
+    # Set CORS origin based on request origin
+    cors_origin = origin if origin in allowed_origins else allowed_origins[0]
+    
     headers = {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': cors_origin,
         'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+        'Access-Control-Allow-Credentials': 'true'
     }
     
     try:

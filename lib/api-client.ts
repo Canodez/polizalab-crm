@@ -1,3 +1,5 @@
+import { fetchAuthSession } from 'aws-amplify/auth';
+
 /**
  * API Client for PolizaLab backend
  * Handles HTTP requests with authentication and error handling
@@ -6,17 +8,12 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_GATEWAY_URL || '';
 
 /**
- * Get authentication token from localStorage
+ * Get authentication token from Amplify
  */
-function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  
-  const tokensStr = localStorage.getItem('auth_tokens');
-  if (!tokensStr) return null;
-  
+async function getAuthToken(): Promise<string | null> {
   try {
-    const tokens = JSON.parse(tokensStr);
-    return tokens.idToken || null;
+    const session = await fetchAuthSession();
+    return session.tokens?.idToken?.toString() || null;
   } catch {
     return null;
   }
@@ -43,25 +40,25 @@ async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = getAuthToken();
-  
+  const token = await getAuthToken();
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
-  
+
   if (options.headers) {
     Object.assign(headers, options.headers);
   }
-  
+
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  
+
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers,
   });
-  
+
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new ApiError(
@@ -70,7 +67,7 @@ async function apiRequest<T>(
       errorData.code
     );
   }
-  
+
   return response.json();
 }
 
@@ -91,7 +88,7 @@ export const profileApi = {
       createdAt: string;
     }>('/profile');
   },
-  
+
   /**
    * Update user profile
    */
@@ -101,7 +98,7 @@ export const profileApi = {
       body: JSON.stringify(data),
     });
   },
-  
+
   /**
    * Get pre-signed URL for profile image upload
    */

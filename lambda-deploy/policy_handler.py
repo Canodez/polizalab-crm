@@ -14,6 +14,26 @@ S3_BUCKET = os.environ.get('S3_BUCKET_NAME', 'polizalab-documents-dev')
 policies_table = dynamodb.Table(POLICIES_TABLE)
 
 
+def get_cors_headers(event):
+    """Get CORS headers based on request origin"""
+    origin = event.get('headers', {}).get('origin', '')
+    allowed_origins = [
+        'https://d4srl7zbv9blh.cloudfront.net',
+        'https://crm.antesdefirmar.org'
+    ]
+    
+    # Set CORS origin based on request origin
+    cors_origin = origin if origin in allowed_origins else allowed_origins[0]
+    
+    return {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': cors_origin,
+        'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+        'Access-Control-Allow-Credentials': 'true'
+    }
+
+
 def decimal_default(obj):
     """JSON serializer for Decimal objects"""
     if isinstance(obj, Decimal):
@@ -84,7 +104,7 @@ def calculate_renewal_status(fecha_renovacion):
         return 'NOT_URGENT'
 
 
-def list_policies(user_id):
+def list_policies(user_id, event):
     """GET /policies - List user's policies"""
     try:
         response = policies_table.query(
@@ -99,25 +119,19 @@ def list_policies(user_id):
         
         return {
             'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
+            'headers': get_cors_headers(event),
             'body': json.dumps({'policies': policies}, default=decimal_default)
         }
     except Exception as e:
         print(f'Error listing policies: {str(e)}')
         return {
             'statusCode': 500,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
+            'headers': get_cors_headers(event),
             'body': json.dumps({'error': 'Internal server error'})
         }
 
 
-def get_policy(user_id, policy_id):
+def get_policy(user_id, policy_id, event):
     """GET /policies/:id - Get single policy"""
     try:
         response = policies_table.get_item(Key={'policyId': policy_id})
@@ -125,10 +139,7 @@ def get_policy(user_id, policy_id):
         if 'Item' not in response:
             return {
                 'statusCode': 404,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
+                'headers': get_cors_headers(event),
                 'body': json.dumps({'error': 'Policy not found'})
             }
         
@@ -138,10 +149,7 @@ def get_policy(user_id, policy_id):
         if policy.get('userId') != user_id:
             return {
                 'statusCode': 403,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
+                'headers': get_cors_headers(event),
                 'body': json.dumps({'error': 'Forbidden'})
             }
         
@@ -150,25 +158,19 @@ def get_policy(user_id, policy_id):
         
         return {
             'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
+            'headers': get_cors_headers(event),
             'body': json.dumps(policy, default=decimal_default)
         }
     except Exception as e:
         print(f'Error getting policy: {str(e)}')
         return {
             'statusCode': 500,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
+            'headers': get_cors_headers(event),
             'body': json.dumps({'error': 'Internal server error'})
         }
 
 
-def update_policy(user_id, policy_id, updates):
+def update_policy(user_id, policy_id, updates, event):
     """PUT /policies/:id - Update policy"""
     try:
         # First, get the policy to verify ownership
@@ -177,10 +179,7 @@ def update_policy(user_id, policy_id, updates):
         if 'Item' not in response:
             return {
                 'statusCode': 404,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
+                'headers': get_cors_headers(event),
                 'body': json.dumps({'error': 'Policy not found'})
             }
         
@@ -190,10 +189,7 @@ def update_policy(user_id, policy_id, updates):
         if policy.get('userId') != user_id:
             return {
                 'statusCode': 403,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
+                'headers': get_cors_headers(event),
                 'body': json.dumps({'error': 'Forbidden'})
             }
         
@@ -238,10 +234,7 @@ def update_policy(user_id, policy_id, updates):
         
         return {
             'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
+            'headers': get_cors_headers(event),
             'body': json.dumps({
                 'success': True,
                 'policy': updated_policy
@@ -251,15 +244,12 @@ def update_policy(user_id, policy_id, updates):
         print(f'Error updating policy: {str(e)}')
         return {
             'statusCode': 500,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
+            'headers': get_cors_headers(event),
             'body': json.dumps({'error': 'Internal server error'})
         }
 
 
-def get_upcoming_renewals(user_id):
+def get_upcoming_renewals(user_id, event):
     """GET /policies/renewals - Get upcoming renewals"""
     try:
         response = policies_table.query(
@@ -285,25 +275,19 @@ def get_upcoming_renewals(user_id):
         
         return {
             'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
+            'headers': get_cors_headers(event),
             'body': json.dumps({'renewals': urgent_policies}, default=decimal_default)
         }
     except Exception as e:
         print(f'Error getting renewals: {str(e)}')
         return {
             'statusCode': 500,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
+            'headers': get_cors_headers(event),
             'body': json.dumps({'error': 'Internal server error'})
         }
 
 
-def get_document_upload_url(user_id, body):
+def get_document_upload_url(user_id, body, event):
     """POST /policies/upload-url - Generate pre-signed URL"""
     try:
         file_name = body.get('fileName')
@@ -312,10 +296,7 @@ def get_document_upload_url(user_id, body):
         if not file_name or not file_type:
             return {
                 'statusCode': 400,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
+                'headers': get_cors_headers(event),
                 'body': json.dumps({'error': 'fileName and fileType are required'})
             }
         
@@ -333,10 +314,7 @@ def get_document_upload_url(user_id, body):
         
         return {
             'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
+            'headers': get_cors_headers(event),
             'body': json.dumps({
                 'presignedUrl': presigned_url,
                 's3Key': s3_key
@@ -346,10 +324,7 @@ def get_document_upload_url(user_id, body):
         print(f'Error generating upload URL: {str(e)}')
         return {
             'statusCode': 500,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
+            'headers': get_cors_headers(event),
             'body': json.dumps({'error': 'Internal server error'})
         }
 
@@ -358,16 +333,21 @@ def lambda_handler(event, context):
     """Main Lambda handler"""
     print(f'Event: {json.dumps(event)}')
     
+    # Handle OPTIONS for CORS preflight
+    if event.get('httpMethod') == 'OPTIONS':
+        return {
+            'statusCode': 200,
+            'headers': get_cors_headers(event),
+            'body': ''
+        }
+    
     try:
         user_id = extract_user_id(event)
         
         if not user_id:
             return {
                 'statusCode': 401,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
+                'headers': get_cors_headers(event),
                 'body': json.dumps({'error': 'Unauthorized'})
             }
         
@@ -376,32 +356,29 @@ def lambda_handler(event, context):
         
         # Route requests
         if method == 'GET' and path == '/policies':
-            return list_policies(user_id)
+            return list_policies(user_id, event)
         
         if method == 'GET' and path == '/policies/renewals':
-            return get_upcoming_renewals(user_id)
+            return get_upcoming_renewals(user_id, event)
         
         if method == 'GET' and path.startswith('/policies/'):
             policy_id = event.get('pathParameters', {}).get('id')
             if policy_id:
-                return get_policy(user_id, policy_id)
+                return get_policy(user_id, policy_id, event)
         
         if method == 'PUT' and path.startswith('/policies/'):
             policy_id = event.get('pathParameters', {}).get('id')
             if policy_id:
                 body = json.loads(event.get('body', '{}'))
-                return update_policy(user_id, policy_id, body)
+                return update_policy(user_id, policy_id, body, event)
         
         if method == 'POST' and path == '/policies/upload-url':
             body = json.loads(event.get('body', '{}'))
-            return get_document_upload_url(user_id, body)
+            return get_document_upload_url(user_id, body, event)
         
         return {
             'statusCode': 404,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
+            'headers': get_cors_headers(event),
             'body': json.dumps({'error': 'Not found'})
         }
     
@@ -409,9 +386,6 @@ def lambda_handler(event, context):
         print(f'Error: {str(e)}')
         return {
             'statusCode': 500,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
+            'headers': get_cors_headers(event),
             'body': json.dumps({'error': 'Internal server error'})
         }

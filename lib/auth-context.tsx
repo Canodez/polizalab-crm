@@ -1,14 +1,19 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { Amplify } from 'aws-amplify';
+import { Hub } from 'aws-amplify/utils';
+import amplifyConfig from './amplify-config';
 import {
   loginUser,
   logoutUser,
   getCurrentUser,
   isAuthenticated as checkIsAuthenticated,
   type CurrentUser,
-  type AuthTokens,
 } from './auth';
+
+// Configure Amplify (only runs once)
+Amplify.configure(amplifyConfig, { ssr: false });
 
 /**
  * Authentication state
@@ -54,11 +59,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   });
 
   /**
-   * Load user from stored tokens on mount
+   * Load user from Amplify session
    */
   const loadUser = useCallback(async () => {
     try {
-      if (checkIsAuthenticated()) {
+      const authenticated = await checkIsAuthenticated();
+      
+      if (authenticated) {
         const user = await getCurrentUser();
         setState({
           user,
@@ -75,7 +82,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         });
       }
     } catch (error) {
-      // Token expired or invalid - clear state
       setState({
         user: null,
         isAuthenticated: false,
@@ -86,10 +92,41 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   /**
-   * Initialize auth state on mount
+   * Initialize auth state on mount and listen to auth events
    */
   useEffect(() => {
     loadUser();
+
+    // Listen to Amplify auth events
+    const hubListener = Hub.listen('auth', ({ payload }) => {
+      switch (payload.event) {
+        case 'signedIn':
+          loadUser();
+          break;
+        case 'signedOut':
+          setState({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false,
+            error: null,
+          });
+          break;
+        case 'tokenRefresh':
+          // Token refreshed successfully
+          break;
+        case 'tokenRefresh_failure':
+          // Token refresh failed - user needs to re-authenticate
+          setState({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false,
+            error: 'Session expired. Please login again.',
+          });
+          break;
+      }
+    });
+
+    return () => hubListener();
   }, [loadUser]);
 
   /**
@@ -147,7 +184,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   /**
    * Refresh user data from Cognito
-   * Useful for token refresh or updating user info
    */
   const refreshUser = useCallback(async () => {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
@@ -161,7 +197,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         error: null,
       });
     } catch (error) {
-      // Token expired or invalid - clear state
       setState({
         user: null,
         isAuthenticated: false,

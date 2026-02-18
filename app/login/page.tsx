@@ -96,7 +96,7 @@ function LoginForm() {
                   setEmail(e.target.value);
                   setValidationErrors((prev) => ({ ...prev, email: undefined }));
                 }}
-                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                className={`w-full px-4 py-3 border rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                   validationErrors.email ? 'border-red-500' : 'border-gray-300'
                 }`}
                 placeholder="tu@email.com"
@@ -124,7 +124,7 @@ function LoginForm() {
                   setPassword(e.target.value);
                   setValidationErrors((prev) => ({ ...prev, password: undefined }));
                 }}
-                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                className={`w-full px-4 py-3 border rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                   validationErrors.password ? 'border-red-500' : 'border-gray-300'
                 }`}
                 placeholder="Tu contraseña"
@@ -159,7 +159,7 @@ function LoginForm() {
             <p className="text-sm text-gray-600">
               ¿No tienes cuenta?{' '}
               <a
-                href="/register"
+                href="/register.html"
                 className="text-blue-600 hover:text-blue-700 font-medium"
               >
                 Crear cuenta

@@ -15,8 +15,8 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const checkAuth = () => {
-      const loggedIn = isAuthenticated();
+    const checkAuth = async () => {
+      const loggedIn = await isAuthenticated();
       setIsLoggedIn(loggedIn);
       setIsLoading(false);
       
@@ -88,13 +88,13 @@ export default function Home() {
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <a
-              href="/register"
+              href="/register.html"
               className="w-full sm:w-auto bg-blue-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors text-center"
             >
               Crear cuenta
             </a>
             <a
-              href="/login"
+              href="/login.html"
               className="w-full sm:w-auto bg-white text-blue-600 px-8 py-3 rounded-lg font-medium border-2 border-blue-600 hover:bg-blue-50 transition-colors text-center"
             >
               Iniciar sesión
