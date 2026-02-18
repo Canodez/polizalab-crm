@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { isAuthenticated } from '@/lib/auth';
+import { useAuth } from '@/lib/auth-context';
 import { 
   ClipboardDocumentListIcon, 
   UsersIcon, 
@@ -11,23 +11,14 @@ import {
 
 export default function Home() {
   const router = useRouter();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const { isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const loggedIn = await isAuthenticated();
-      setIsLoggedIn(loggedIn);
-      setIsLoading(false);
-      
-      // If logged in, redirect to profile
-      if (loggedIn) {
-        router.push('/profile');
-      }
-    };
-
-    checkAuth();
-  }, [router]);
+    // Only redirect if auth is loaded and user is authenticated
+    if (!isLoading && isAuthenticated) {
+      router.push('/profile');
+    }
+  }, [isLoading, isAuthenticated, router]);
 
   if (isLoading) {
     return (
