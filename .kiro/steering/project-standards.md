@@ -179,6 +179,57 @@ components/
   └── features/             # Componentes específicos de features
 ```
 
+## Configuración de AWS
+
+### API Gateway - CORS
+
+El API Gateway debe estar configurado para aceptar peticiones desde los siguientes orígenes:
+
+**Orígenes permitidos (Access-Control-Allow-Origin):**
+- `http://localhost:3000` (desarrollo local)
+- `https://d4srl7zbv9blh.cloudfront.net` (CloudFront)
+- `https://crm.antesdefirmar.org` (dominio personalizado)
+
+**Headers requeridos:**
+- `Access-Control-Allow-Origin`: Debe incluir los orígenes listados arriba
+- `Access-Control-Allow-Methods`: `GET, POST, PUT, DELETE, OPTIONS`
+- `Access-Control-Allow-Headers`: `Content-Type, Authorization, X-Amz-Date, X-Api-Key, X-Amz-Security-Token`
+- `Access-Control-Allow-Credentials`: `true` (si se usan cookies/credenciales)
+
+**Endpoints que requieren CORS:**
+- `/profile` (GET, PUT)
+- `/policies` (GET, POST, PUT, DELETE)
+- Todos los endpoints de la API
+
+### Verificación de CORS
+
+Para verificar que CORS está configurado correctamente:
+
+```bash
+# Verificar desde localhost
+curl -H "Origin: http://localhost:3000" \
+  -H "Access-Control-Request-Method: GET" \
+  -H "Access-Control-Request-Headers: Content-Type,Authorization" \
+  -X OPTIONS \
+  https://f34orvshp5.execute-api.us-east-1.amazonaws.com/prod/profile
+
+# Verificar desde CloudFront
+curl -H "Origin: https://d4srl7zbv9blh.cloudfront.net" \
+  -H "Access-Control-Request-Method: GET" \
+  -H "Access-Control-Request-Headers: Content-Type,Authorization" \
+  -X OPTIONS \
+  https://f34orvshp5.execute-api.us-east-1.amazonaws.com/prod/profile
+
+# Verificar desde dominio personalizado
+curl -H "Origin: https://crm.antesdefirmar.org" \
+  -H "Access-Control-Request-Method: GET" \
+  -H "Access-Control-Request-Headers: Content-Type,Authorization" \
+  -X OPTIONS \
+  https://f34orvshp5.execute-api.us-east-1.amazonaws.com/prod/profile
+```
+
+La respuesta debe incluir los headers CORS correctos.
+
 ## Resumen de Reglas Críticas
 
 1. ❌ **NO usar emojis** → ✅ Usar librería de iconos (Heroicons)
@@ -188,6 +239,7 @@ components/
 5. ✅ Mantener accesibilidad en mente
 6. ✅ Usar Tailwind CSS para estilos
 7. ✅ Escribir tests para funcionalidad crítica
+8. ✅ **CORS debe estar configurado** para localhost, CloudFront y dominio personalizado
 
 ---
 
