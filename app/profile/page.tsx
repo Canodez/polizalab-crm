@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { profileApi, ApiError } from '@/lib/api-client';
+import UserMenu from '@/components/UserMenu';
 
 interface ProfileData {
   userId: string;
@@ -200,11 +201,21 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 py-8 px-4">
-      <div className="mx-auto max-w-2xl">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-zinc-900">Mi Perfil</h1>
+    <div className="min-h-screen bg-zinc-50">
+      {/* Header with UserMenu */}
+      <div className="bg-white shadow-sm">
+        <div className="mx-auto max-w-7xl px-4 py-4 flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-zinc-900">PolizaLab CRM</h1>
+          <UserMenu />
         </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="py-8 px-4">
+        <div className="mx-auto max-w-2xl">
+          <div className="mb-6">
+            <h2 className="text-3xl font-bold text-zinc-900">Mi Perfil</h2>
+          </div>
 
         <div className="rounded-lg bg-white p-6 shadow-sm">
           {/* Profile Image */}
@@ -333,6 +344,7 @@ export default function ProfilePage() {
               </>
             )}
           </div>
+        </div>
         </div>
       </div>
     </div>

@@ -1,4 +1,6 @@
 import { fetchAuthSession } from 'aws-amplify/auth';
+import { logoutUser } from './auth';
+import { showError } from './toast';
 
 /**
  * API Client for PolizaLab backend
@@ -6,6 +8,27 @@ import { fetchAuthSession } from 'aws-amplify/auth';
  */
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_GATEWAY_URL || '';
+
+/**
+ * Handle session expiration (401 errors)
+ * Shows toast notification, logs out user, and redirects to login
+ */
+async function handleSessionExpired(): Promise<void> {
+  // Show toast notification
+  showError('Tu sesión expiró');
+  
+  try {
+    // Logout user
+    await logoutUser();
+  } catch (error) {
+    console.error('Error during logout:', error);
+  }
+  
+  // Redirect to login with expired flag
+  if (typeof window !== 'undefined') {
+    window.location.assign('/login?expired=true');
+  }
+}
 
 /**
  * Get authentication token from Amplify
@@ -58,6 +81,17 @@ async function apiRequest<T>(
     ...options,
     headers,
   });
+
+  // Handle 401 Unauthorized - session expired
+  if (response.status === 401) {
+    await handleSessionExpired();
+    // Throw error to prevent further processing
+    throw new ApiError(
+      'Tu sesión expiró',
+      401,
+      'SESSION_EXPIRED'
+    );
+  }
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));

@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import { AuthProvider, useAuth } from '../auth-context';
 import * as authModule from '../auth';
+import { Hub } from 'aws-amplify/utils';
 
 // Mock the auth module
 jest.mock('../auth');
@@ -480,6 +481,94 @@ describe('AuthContext', () => {
       await waitFor(() => {
         expect(screen.getByTestId('error')).toHaveTextContent('Failed to refresh user');
       });
+    });
+  });
+
+  describe('Hub events - token refresh failure', () => {
+    it('should handle tokenRefresh_failure event and update state', async () => {
+      const mockUser = {
+        userId: 'user-123',
+        email: 'test@example.com',
+        emailVerified: true,
+      };
+
+      mockIsAuthenticated.mockReturnValue(true);
+      mockGetCurrentUser.mockResolvedValue(mockUser);
+
+      render(
+        <AuthProvider>
+          <TestComponent />
+        </AuthProvider>
+      );
+
+      // Wait for initial load
+      await waitFor(() => {
+        expect(screen.getByTestId('authenticated')).toHaveTextContent('authenticated');
+      });
+
+      // Simulate tokenRefresh_failure event
+      await act(async () => {
+        Hub.dispatch('auth', {
+          event: 'tokenRefresh_failure',
+          data: {},
+          message: 'Token refresh failed',
+        });
+      });
+
+      // Should update state to not authenticated
+      await waitFor(() => {
+        expect(screen.getByTestId('authenticated')).toHaveTextContent('not-authenticated');
+      });
+
+      // Should show error message
+      expect(screen.getByTestId('error')).toHaveTextContent('Sesión expirada');
+
+      // Should clear user
+      expect(screen.getByTestId('user')).toHaveTextContent('no-user');
+
+      // Note: Redirect to /login?expired=true is tested in E2E tests
+    });
+
+    it('should handle signedOut event', async () => {
+      const mockUser = {
+        userId: 'user-123',
+        email: 'test@example.com',
+        emailVerified: true,
+      };
+
+      mockIsAuthenticated.mockReturnValue(true);
+      mockGetCurrentUser.mockResolvedValue(mockUser);
+
+      render(
+        <AuthProvider>
+          <TestComponent />
+        </AuthProvider>
+      );
+
+      // Wait for initial load
+      await waitFor(() => {
+        expect(screen.getByTestId('authenticated')).toHaveTextContent('authenticated');
+      });
+
+      // Simulate signedOut event
+      await act(async () => {
+        Hub.dispatch('auth', {
+          event: 'signedOut',
+          data: {},
+          message: 'User signed out',
+        });
+      });
+
+      // Should update state to not authenticated
+      await waitFor(() => {
+        expect(screen.getByTestId('authenticated')).toHaveTextContent('not-authenticated');
+      });
+
+      // Should clear user
+      expect(screen.getByTestId('user')).toHaveTextContent('no-user');
+
+      // Should not show error
+      expect(screen.getByTestId('error')).toHaveTextContent('no-error');
     });
   });
 });

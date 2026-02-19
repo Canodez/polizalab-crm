@@ -3,10 +3,14 @@
 import { useState, FormEvent, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { loginUser } from '@/lib/auth';
+import { useAuth } from '@/lib/auth-context';
+import LoadingSpinner from '@/components/LoadingSpinner';
+import AlreadyLoggedInView from '@/components/AlreadyLoggedInView';
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -18,6 +22,9 @@ function LoginForm() {
 
   // Check if user just registered
   const justRegistered = searchParams.get('registered') === 'true';
+  
+  // Check if session expired
+  const sessionExpired = searchParams.get('expired') === 'true';
 
   // Client-side validation
   const validateForm = (): boolean => {
@@ -62,6 +69,28 @@ function LoginForm() {
     }
   };
 
+  // Handle restart session (clear expired param and reload form)
+  const handleRestartSession = () => {
+    router.push('/login');
+  };
+
+  // Show loading state while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12">
+        <div className="text-center">
+          <LoadingSpinner size="lg" className="mx-auto mb-4" />
+          <p className="text-gray-600">Verificando sesión...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If user is already authenticated, show different view
+  if (isAuthenticated && user) {
+    return <AlreadyLoggedInView />;
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12">
       <div className="w-full max-w-md">
@@ -76,6 +105,33 @@ function LoginForm() {
               <p className="text-sm text-green-800">
                 ¡Cuenta creada exitosamente! Ahora puedes iniciar sesión.
               </p>
+            </div>
+          )}
+
+          {/* Session expired warning */}
+          {sessionExpired && (
+            <div className="mb-6 bg-amber-50 border border-amber-300 rounded-lg p-4">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3 flex-1">
+                  <p className="text-sm font-medium text-amber-800">
+                    Tu sesión expiró
+                  </p>
+                  <p className="mt-1 text-sm text-amber-700">
+                    Por favor, inicia sesión nuevamente para continuar.
+                  </p>
+                  <button
+                    onClick={handleRestartSession}
+                    className="mt-3 inline-flex items-center px-3 py-1.5 border border-amber-300 text-sm font-medium rounded-md text-amber-800 bg-white hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition-colors"
+                  >
+                    Reiniciar sesión
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 

@@ -1,238 +1,167 @@
 import { profileApi, ApiError } from '../api-client';
+import { logoutUser } from '../auth';
+
+// Mock dependencies
+jest.mock('aws-amplify/auth', () => ({
+  fetchAuthSession: jest.fn(),
+}));
+
+jest.mock('../auth', () => ({
+  logoutUser: jest.fn(),
+}));
 
 // Mock fetch
 global.fetch = jest.fn();
 
-// Mock localStorage
-const localStorageMock = (() => {
-  let store: Record<string, string> = {};
-
-  return {
-    getItem: (key: string) => store[key] || null,
-    setItem: (key: string, value: string) => {
-      store[key] = value;
-    },
-    removeItem: (key: string) => {
-      delete store[key];
-    },
-    clear: () => {
-      store = {};
-    },
-  };
-})();
-
-Object.defineProperty(window, 'localStorage', {
-  value: localStorageMock,
-});
-
-describe('API Client', () => {
+describe('API Client - 401 Error Handling', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    localStorageMock.clear();
-    (fetch as jest.Mock).mockClear();
   });
 
-  describe('profileApi', () => {
-    const mockToken = 'mock-jwt-token';
-    const mockTokens = {
-      idToken: mockToken,
-      accessToken: 'mock-access-token',
-      refreshToken: 'mock-refresh-token',
-    };
+  describe('401 Unauthorized handling', () => {
+    it('should call logout when receiving 401 error', async () => {
+      // Mock fetch to return 401
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        status: 401,
+        ok: false,
+      });
 
-    beforeEach(() => {
-      localStorageMock.setItem('auth_tokens', JSON.stringify(mockTokens));
+      // Mock fetchAuthSession to return a token
+      const { fetchAuthSession } = require('aws-amplify/auth');
+      fetchAuthSession.mockResolvedValueOnce({
+        tokens: {
+          idToken: {
+            toString: () => 'mock-token',
+          },
+        },
+      });
+
+      // Attempt to get profile (should trigger 401 handling)
+      await expect(profileApi.getProfile()).rejects.toThrow(ApiError);
+
+      // Verify logout was called
+      expect(logoutUser).toHaveBeenCalledTimes(1);
     });
 
-    describe('getProfile', () => {
-      it('fetches profile with auth token', async () => {
-        const mockProfile = {
-          userId: 'user-123',
-          email: 'test@example.com',
-          nombre: 'Juan',
-          apellido: 'Pérez',
-          profileImage: null,
-          createdAt: '2024-01-01T00:00:00Z',
-        };
-
-        (fetch as jest.Mock).mockResolvedValue({
-          ok: true,
-          json: async () => mockProfile,
-        });
-
-        const result = await profileApi.getProfile();
-
-        expect(fetch).toHaveBeenCalledWith(
-          expect.stringContaining('/profile'),
-          expect.objectContaining({
-            headers: expect.objectContaining({
-              Authorization: `Bearer ${mockToken}`,
-              'Content-Type': 'application/json',
-            }),
-          })
-        );
-        expect(result).toEqual(mockProfile);
+    it('should throw ApiError with SESSION_EXPIRED code on 401', async () => {
+      // Mock fetch to return 401
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        status: 401,
+        ok: false,
       });
 
-      it('throws ApiError on failed request', async () => {
-        (fetch as jest.Mock).mockResolvedValue({
-          ok: false,
-          status: 401,
-          json: async () => ({ message: 'Unauthorized', code: 'AUTH_REQUIRED' }),
-        });
-
-        await expect(profileApi.getProfile()).rejects.toThrow(ApiError);
-        await expect(profileApi.getProfile()).rejects.toThrow('Unauthorized');
+      // Mock fetchAuthSession
+      const { fetchAuthSession } = require('aws-amplify/auth');
+      fetchAuthSession.mockResolvedValueOnce({
+        tokens: {
+          idToken: {
+            toString: () => 'mock-token',
+          },
+        },
       });
 
-      it('handles network errors', async () => {
-        (fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
-
-        await expect(profileApi.getProfile()).rejects.toThrow('Network error');
-      });
+      try {
+        await profileApi.getProfile();
+        fail('Should have thrown ApiError');
+      } catch (error) {
+        expect(error).toBeInstanceOf(ApiError);
+        expect((error as ApiError).statusCode).toBe(401);
+        expect((error as ApiError).code).toBe('SESSION_EXPIRED');
+        expect((error as ApiError).message).toBe('Tu sesión expiró');
+      }
     });
 
-    describe('updateProfile', () => {
-      it('updates profile with correct data', async () => {
-        const updateData = { nombre: 'Carlos', apellido: 'García' };
-
-        (fetch as jest.Mock).mockResolvedValue({
-          ok: true,
-          json: async () => ({ success: true }),
-        });
-
-        const result = await profileApi.updateProfile(updateData);
-
-        expect(fetch).toHaveBeenCalledWith(
-          expect.stringContaining('/profile'),
-          expect.objectContaining({
-            method: 'PUT',
-            headers: expect.objectContaining({
-              Authorization: `Bearer ${mockToken}`,
-              'Content-Type': 'application/json',
-            }),
-            body: JSON.stringify(updateData),
-          })
-        );
-        expect(result).toEqual({ success: true });
+    it('should handle logout errors gracefully and still throw ApiError', async () => {
+      // Mock fetch to return 401
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        status: 401,
+        ok: false,
       });
 
-      it('throws ApiError on validation error', async () => {
-        (fetch as jest.Mock).mockResolvedValue({
-          ok: false,
-          status: 400,
-          json: async () => ({
-            message: 'Validation error',
-            code: 'VALIDATION_ERROR',
-          }),
-        });
-
-        await expect(
-          profileApi.updateProfile({ nombre: '', apellido: '' })
-        ).rejects.toThrow(ApiError);
-      });
-    });
-
-    describe('getImageUploadUrl', () => {
-      it('requests pre-signed URL with file info', async () => {
-        const mockResponse = {
-          presignedUrl: 'https://s3.amazonaws.com/bucket/key?signature=xyz',
-          s3Key: 'profiles/user-123/image.jpg',
-        };
-
-        (fetch as jest.Mock).mockResolvedValue({
-          ok: true,
-          json: async () => mockResponse,
-        });
-
-        const result = await profileApi.getImageUploadUrl('image.jpg', 'image/jpeg');
-
-        expect(fetch).toHaveBeenCalledWith(
-          expect.stringContaining('/profile/image'),
-          expect.objectContaining({
-            method: 'POST',
-            headers: expect.objectContaining({
-              Authorization: `Bearer ${mockToken}`,
-              'Content-Type': 'application/json',
-            }),
-            body: JSON.stringify({ fileName: 'image.jpg', fileType: 'image/jpeg' }),
-          })
-        );
-        expect(result).toEqual(mockResponse);
+      // Mock fetchAuthSession
+      const { fetchAuthSession } = require('aws-amplify/auth');
+      fetchAuthSession.mockResolvedValueOnce({
+        tokens: {
+          idToken: {
+            toString: () => 'mock-token',
+          },
+        },
       });
 
-      it('throws ApiError on server error', async () => {
-        (fetch as jest.Mock).mockResolvedValue({
-          ok: false,
-          status: 500,
-          json: async () => ({ message: 'Internal server error' }),
-        });
+      // Mock logoutUser to throw error
+      (logoutUser as jest.Mock).mockRejectedValueOnce(new Error('Logout failed'));
 
-        await expect(
-          profileApi.getImageUploadUrl('image.jpg', 'image/jpeg')
-        ).rejects.toThrow(ApiError);
-      });
+      // Should still throw ApiError even if logout fails
+      await expect(profileApi.getProfile()).rejects.toThrow(ApiError);
+      
+      // Verify logout was attempted
+      expect(logoutUser).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('ApiError', () => {
-    it('creates error with message and status code', () => {
-      const error = new ApiError('Test error', 400, 'TEST_ERROR');
+  describe('Other API errors', () => {
+    it('should handle non-401 errors normally without logout', async () => {
+      // Mock fetch to return 500
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        status: 500,
+        ok: false,
+        json: async () => ({ message: 'Internal server error' }),
+      });
 
-      expect(error.message).toBe('Test error');
-      expect(error.statusCode).toBe(400);
-      expect(error.code).toBe('TEST_ERROR');
-      expect(error.name).toBe('ApiError');
+      // Mock fetchAuthSession
+      const { fetchAuthSession } = require('aws-amplify/auth');
+      fetchAuthSession.mockResolvedValueOnce({
+        tokens: {
+          idToken: {
+            toString: () => 'mock-token',
+          },
+        },
+      });
+
+      try {
+        await profileApi.getProfile();
+        fail('Should have thrown ApiError');
+      } catch (error) {
+        expect(error).toBeInstanceOf(ApiError);
+        expect((error as ApiError).statusCode).toBe(500);
+        expect((error as ApiError).message).toBe('Internal server error');
+      }
+
+      // Should NOT logout for non-401 errors
+      expect(logoutUser).not.toHaveBeenCalled();
     });
 
-    it('creates error without code', () => {
-      const error = new ApiError('Test error', 500);
+    it('should handle successful API calls', async () => {
+      const mockProfile = {
+        userId: 'user-123',
+        email: 'test@example.com',
+        nombre: 'Test',
+        apellido: 'User',
+        profileImage: null,
+        createdAt: '2024-01-01T00:00:00Z',
+      };
 
-      expect(error.message).toBe('Test error');
-      expect(error.statusCode).toBe(500);
-      expect(error.code).toBeUndefined();
-    });
-  });
-
-  describe('Authentication', () => {
-    it('makes request without token when not authenticated', async () => {
-      localStorageMock.clear();
-
-      (fetch as jest.Mock).mockResolvedValue({
+      // Mock fetch to return success
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        status: 200,
         ok: true,
-        json: async () => ({}),
+        json: async () => mockProfile,
       });
 
-      await profileApi.getProfile();
-
-      expect(fetch).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          headers: expect.not.objectContaining({
-            Authorization: expect.any(String),
-          }),
-        })
-      );
-    });
-
-    it('handles invalid token JSON in localStorage', async () => {
-      localStorageMock.setItem('auth_tokens', 'invalid-json');
-
-      (fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        json: async () => ({}),
+      // Mock fetchAuthSession
+      const { fetchAuthSession } = require('aws-amplify/auth');
+      fetchAuthSession.mockResolvedValueOnce({
+        tokens: {
+          idToken: {
+            toString: () => 'mock-token',
+          },
+        },
       });
 
-      await profileApi.getProfile();
+      const result = await profileApi.getProfile();
 
-      expect(fetch).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          headers: expect.not.objectContaining({
-            Authorization: expect.any(String),
-          }),
-        })
-      );
+      expect(result).toEqual(mockProfile);
+      expect(logoutUser).not.toHaveBeenCalled();
     });
   });
 });

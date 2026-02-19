@@ -120,8 +120,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
             user: null,
             isAuthenticated: false,
             isLoading: false,
-            error: 'Session expired. Please login again.',
+            error: 'Sesión expirada',
           });
+          // Redirect to login with expired flag (only in browser)
+          if (typeof window !== 'undefined') {
+            window.location.assign('/login?expired=true');
+          }
           break;
       }
     });

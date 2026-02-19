@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import LoginPage from '../page';
 import { loginUser } from '@/lib/auth';
+import { useAuth } from '@/lib/auth-context';
 
 // Mock Next.js router
 jest.mock('next/navigation', () => ({
@@ -14,9 +15,15 @@ jest.mock('@/lib/auth', () => ({
   loginUser: jest.fn(),
 }));
 
+// Mock auth context
+jest.mock('@/lib/auth-context', () => ({
+  useAuth: jest.fn(),
+}));
+
 describe('LoginPage', () => {
   const mockPush = jest.fn();
   const mockLoginUser = loginUser as jest.MockedFunction<typeof loginUser>;
+  const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
   const mockSearchParams = {
     get: jest.fn(),
   };
@@ -28,6 +35,17 @@ describe('LoginPage', () => {
     });
     (useSearchParams as jest.Mock).mockReturnValue(mockSearchParams);
     mockSearchParams.get.mockReturnValue(null);
+    
+    // Default mock: user is not authenticated and not loading
+    mockUseAuth.mockReturnValue({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      error: null,
+      login: jest.fn(),
+      logout: jest.fn(),
+      refreshUser: jest.fn(),
+    });
   });
 
   it('renders login form with all fields', () => {
@@ -281,6 +299,423 @@ describe('LoginPage', () => {
     // Error should be cleared immediately on resubmit
     await waitFor(() => {
       expect(screen.queryByText(errorMessage)).not.toBeInTheDocument();
+    });
+  });
+
+  // New tests for session detection (Task 1.1)
+  it('shows loading spinner while checking authentication', () => {
+    mockUseAuth.mockReturnValue({
+      user: null,
+      isAuthenticated: false,
+      isLoading: true,
+      error: null,
+      login: jest.fn(),
+      logout: jest.fn(),
+      refreshUser: jest.fn(),
+    });
+
+    render(<LoginPage />);
+
+    expect(screen.getByText('Verificando sesión...')).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Cargando' })).toBeInTheDocument();
+  });
+
+  it('shows already logged in view when user is authenticated', () => {
+    mockUseAuth.mockReturnValue({
+      user: {
+        userId: 'test-user-id',
+        email: 'test@example.com',
+        emailVerified: true,
+      },
+      isAuthenticated: true,
+      isLoading: false,
+      error: null,
+      login: jest.fn(),
+      logout: jest.fn(),
+      refreshUser: jest.fn(),
+    });
+
+    render(<LoginPage />);
+
+    expect(screen.getByText('Ya tienes sesión iniciada')).toBeInTheDocument();
+    expect(screen.getByText('test@example.com')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ir a mi perfil' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toBeInTheDocument();
+  });
+
+  it('navigates to profile when clicking "Ir a mi perfil" button', () => {
+    mockUseAuth.mockReturnValue({
+      user: {
+        userId: 'test-user-id',
+        email: 'test@example.com',
+        emailVerified: true,
+      },
+      isAuthenticated: true,
+      isLoading: false,
+      error: null,
+      login: jest.fn(),
+      logout: jest.fn(),
+      refreshUser: jest.fn(),
+    });
+
+    render(<LoginPage />);
+
+    const profileButton = screen.getByRole('button', { name: 'Ir a mi perfil' });
+    fireEvent.click(profileButton);
+
+    expect(mockPush).toHaveBeenCalledWith('/profile');
+  });
+
+  it('shows login form when user is not authenticated', () => {
+    mockUseAuth.mockReturnValue({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      error: null,
+      login: jest.fn(),
+      logout: jest.fn(),
+      refreshUser: jest.fn(),
+    });
+
+    render(<LoginPage />);
+
+    expect(screen.getByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Correo electrónico')).toBeInTheDocument();
+    expect(screen.getByLabelText('Contraseña')).toBeInTheDocument();
+  });
+
+  // Task 1.4: Testing de login inteligente
+  describe('Task 1.4: Smart Login Testing', () => {
+    // 1.4.1: Test: Usuario sin sesión ve formulario
+    describe('1.4.1: User without session sees form', () => {
+      it('displays login form with all fields when user is not authenticated', () => {
+        mockUseAuth.mockReturnValue({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+          error: null,
+          login: jest.fn(),
+          logout: jest.fn(),
+          refreshUser: jest.fn(),
+        });
+
+        render(<LoginPage />);
+
+        // Verify form elements are present
+        expect(screen.getByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
+        expect(screen.getByLabelText('Correo electrónico')).toBeInTheDocument();
+        expect(screen.getByLabelText('Contraseña')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /iniciar sesión/i })).toBeInTheDocument();
+        
+        // Verify AlreadyLoggedInView is NOT shown
+        expect(screen.queryByText('Ya tienes sesión iniciada')).not.toBeInTheDocument();
+      });
+
+      it('does not show loading spinner when auth check is complete', () => {
+        mockUseAuth.mockReturnValue({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+          error: null,
+          login: jest.fn(),
+          logout: jest.fn(),
+          refreshUser: jest.fn(),
+        });
+
+        render(<LoginPage />);
+
+        expect(screen.queryByText('Verificando sesión...')).not.toBeInTheDocument();
+        expect(screen.queryByRole('status', { name: 'Cargando' })).not.toBeInTheDocument();
+      });
+    });
+
+    // 1.4.2: Test: Usuario con sesión ve AlreadyLoggedInView
+    describe('1.4.2: User with session sees AlreadyLoggedInView', () => {
+      it('displays AlreadyLoggedInView when user is authenticated', () => {
+        mockUseAuth.mockReturnValue({
+          user: {
+            userId: 'test-user-id',
+            email: 'authenticated@example.com',
+            emailVerified: true,
+          },
+          isAuthenticated: true,
+          isLoading: false,
+          error: null,
+          login: jest.fn(),
+          logout: jest.fn(),
+          refreshUser: jest.fn(),
+        });
+
+        render(<LoginPage />);
+
+        // Verify AlreadyLoggedInView is shown
+        expect(screen.getByText('Ya tienes sesión iniciada')).toBeInTheDocument();
+        expect(screen.getByText('authenticated@example.com')).toBeInTheDocument();
+        
+        // Verify login form is NOT shown
+        expect(screen.queryByLabelText('Correo electrónico')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('Contraseña')).not.toBeInTheDocument();
+      });
+
+      it('shows user email in AlreadyLoggedInView', () => {
+        const testEmail = 'user@test.com';
+        mockUseAuth.mockReturnValue({
+          user: {
+            userId: 'test-user-id',
+            email: testEmail,
+            emailVerified: true,
+          },
+          isAuthenticated: true,
+          isLoading: false,
+          error: null,
+          login: jest.fn(),
+          logout: jest.fn(),
+          refreshUser: jest.fn(),
+        });
+
+        render(<LoginPage />);
+
+        expect(screen.getByText(testEmail)).toBeInTheDocument();
+        expect(screen.getByText('Sesión activa como:')).toBeInTheDocument();
+      });
+
+      it('does not show AlreadyLoggedInView when user is not authenticated', () => {
+        mockUseAuth.mockReturnValue({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+          error: null,
+          login: jest.fn(),
+          logout: jest.fn(),
+          refreshUser: jest.fn(),
+        });
+
+        render(<LoginPage />);
+
+        expect(screen.queryByText('Ya tienes sesión iniciada')).not.toBeInTheDocument();
+      });
+    });
+
+    // 1.4.3: Test: Sesión expirada muestra mensaje correcto
+    describe('1.4.3: Expired session shows correct message', () => {
+      it('displays expired session warning when expired=true query param is present', () => {
+        mockSearchParams.get.mockImplementation((key) => {
+          if (key === 'expired') return 'true';
+          return null;
+        });
+
+        mockUseAuth.mockReturnValue({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+          error: null,
+          login: jest.fn(),
+          logout: jest.fn(),
+          refreshUser: jest.fn(),
+        });
+
+        render(<LoginPage />);
+
+        expect(screen.getByText('Tu sesión expiró')).toBeInTheDocument();
+        expect(screen.getByText('Por favor, inicia sesión nuevamente para continuar.')).toBeInTheDocument();
+      });
+
+      it('shows restart session button when session expired', () => {
+        mockSearchParams.get.mockImplementation((key) => {
+          if (key === 'expired') return 'true';
+          return null;
+        });
+
+        mockUseAuth.mockReturnValue({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+          error: null,
+          login: jest.fn(),
+          logout: jest.fn(),
+          refreshUser: jest.fn(),
+        });
+
+        render(<LoginPage />);
+
+        const restartButton = screen.getByRole('button', { name: 'Reiniciar sesión' });
+        expect(restartButton).toBeInTheDocument();
+      });
+
+      it('redirects to clean login page when restart session button is clicked', () => {
+        mockSearchParams.get.mockImplementation((key) => {
+          if (key === 'expired') return 'true';
+          return null;
+        });
+
+        mockUseAuth.mockReturnValue({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+          error: null,
+          login: jest.fn(),
+          logout: jest.fn(),
+          refreshUser: jest.fn(),
+        });
+
+        render(<LoginPage />);
+
+        const restartButton = screen.getByRole('button', { name: 'Reiniciar sesión' });
+        fireEvent.click(restartButton);
+
+        expect(mockPush).toHaveBeenCalledWith('/login');
+      });
+
+      it('does not show expired session warning when expired param is not present', () => {
+        mockSearchParams.get.mockReturnValue(null);
+
+        mockUseAuth.mockReturnValue({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+          error: null,
+          login: jest.fn(),
+          logout: jest.fn(),
+          refreshUser: jest.fn(),
+        });
+
+        render(<LoginPage />);
+
+        expect(screen.queryByText('Tu sesión expiró')).not.toBeInTheDocument();
+      });
+
+      it('shows login form along with expired session message', () => {
+        mockSearchParams.get.mockImplementation((key) => {
+          if (key === 'expired') return 'true';
+          return null;
+        });
+
+        mockUseAuth.mockReturnValue({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+          error: null,
+          login: jest.fn(),
+          logout: jest.fn(),
+          refreshUser: jest.fn(),
+        });
+
+        render(<LoginPage />);
+
+        // Both expired message and login form should be visible
+        expect(screen.getByText('Tu sesión expiró')).toBeInTheDocument();
+        expect(screen.getByLabelText('Correo electrónico')).toBeInTheDocument();
+        expect(screen.getByLabelText('Contraseña')).toBeInTheDocument();
+      });
+    });
+
+    // 1.4.4: Test: Botones funcionan correctamente
+    describe('1.4.4: Buttons work correctly', () => {
+      it('navigates to profile when "Ir a mi perfil" button is clicked', () => {
+        mockUseAuth.mockReturnValue({
+          user: {
+            userId: 'test-user-id',
+            email: 'test@example.com',
+            emailVerified: true,
+          },
+          isAuthenticated: true,
+          isLoading: false,
+          error: null,
+          login: jest.fn(),
+          logout: jest.fn(),
+          refreshUser: jest.fn(),
+        });
+
+        render(<LoginPage />);
+
+        const profileButton = screen.getByRole('button', { name: 'Ir a mi perfil' });
+        fireEvent.click(profileButton);
+
+        expect(mockPush).toHaveBeenCalledWith('/profile');
+      });
+
+      it('calls logout when "Cerrar sesión" button is clicked', async () => {
+        const mockLogout = jest.fn().mockResolvedValue(undefined);
+        mockUseAuth.mockReturnValue({
+          user: {
+            userId: 'test-user-id',
+            email: 'test@example.com',
+            emailVerified: true,
+          },
+          isAuthenticated: true,
+          isLoading: false,
+          error: null,
+          login: jest.fn(),
+          logout: mockLogout,
+          refreshUser: jest.fn(),
+        });
+
+        render(<LoginPage />);
+
+        const logoutButton = screen.getByRole('button', { name: 'Cerrar sesión' });
+        fireEvent.click(logoutButton);
+
+        await waitFor(() => {
+          expect(mockLogout).toHaveBeenCalled();
+        });
+      });
+
+      it('calls logout when "Cambiar de cuenta" link is clicked', async () => {
+        const mockLogout = jest.fn().mockResolvedValue(undefined);
+        mockUseAuth.mockReturnValue({
+          user: {
+            userId: 'test-user-id',
+            email: 'test@example.com',
+            emailVerified: true,
+          },
+          isAuthenticated: true,
+          isLoading: false,
+          error: null,
+          login: jest.fn(),
+          logout: mockLogout,
+          refreshUser: jest.fn(),
+        });
+
+        render(<LoginPage />);
+
+        const switchAccountButton = screen.getByRole('button', { name: 'Cambiar de cuenta' });
+        fireEvent.click(switchAccountButton);
+
+        await waitFor(() => {
+          expect(mockLogout).toHaveBeenCalled();
+        });
+      });
+
+      it('handles logout errors gracefully', async () => {
+        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+        const mockLogout = jest.fn().mockRejectedValue(new Error('Logout failed'));
+        
+        mockUseAuth.mockReturnValue({
+          user: {
+            userId: 'test-user-id',
+            email: 'test@example.com',
+            emailVerified: true,
+          },
+          isAuthenticated: true,
+          isLoading: false,
+          error: null,
+          login: jest.fn(),
+          logout: mockLogout,
+          refreshUser: jest.fn(),
+        });
+
+        render(<LoginPage />);
+
+        const logoutButton = screen.getByRole('button', { name: 'Cerrar sesión' });
+        fireEvent.click(logoutButton);
+
+        await waitFor(() => {
+          expect(mockLogout).toHaveBeenCalled();
+          expect(consoleErrorSpy).toHaveBeenCalled();
+        });
+
+        consoleErrorSpy.mockRestore();
+      });
     });
   });
 });
