@@ -181,6 +181,24 @@ components/
 
 ## Configuración de AWS
 
+### AWS CLI
+
+**Versiones instaladas:**
+- AWS CLI v1: `C:\Program Files\Amazon\AWSCLI\bin\aws.exe` (aws-cli/1.18.203)
+- AWS CLI v2: `C:\Program Files\Amazon\AWSCLIV2\aws.exe` (aws-cli/2.33.2) ✅ **USAR ESTA**
+
+**Importante:**
+- Para operaciones de CloudFront Functions, S3, y otros servicios modernos, SIEMPRE usar AWS CLI v2
+- AWS CLI v1 no soporta CloudFront Functions API
+- En scripts de PowerShell, usar la ruta completa: `& "C:\Program Files\Amazon\AWSCLIV2\aws.exe"`
+
+**Ejemplo de uso en scripts:**
+```powershell
+# Usar AWS CLI v2 explícitamente
+$awsCmd = "C:\Program Files\Amazon\AWSCLIV2\aws.exe"
+& $awsCmd cloudfront create-function --name my-function ...
+```
+
 ### API Gateway - CORS
 
 El API Gateway debe estar configurado para aceptar peticiones desde los siguientes orígenes:

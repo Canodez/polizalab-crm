@@ -1,0 +1,20 @@
+{
+  "Name": "PolizaLab-Assets-LongCache",
+  "Comment": "Cache policy for versioned assets - 1 year cache for immutable files",
+  "DefaultTTL": 31536000,
+  "MaxTTL": 31536000,
+  "MinTTL": 0,
+  "ParametersInCacheKeyAndForwardedToOrigin": {
+    "EnableAcceptEncodingGzip": true,
+    "EnableAcceptEncodingBrotli": true,
+    "HeadersConfig": {
+      "HeaderBehavior": "none"
+    },
+    "CookiesConfig": {
+      "CookieBehavior": "none"
+    },
+    "QueryStringsConfig": {
+      "QueryStringBehavior": "none"
+    }
+  }
+}

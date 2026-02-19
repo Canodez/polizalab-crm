@@ -39,3 +39,31 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Lambda deployment artifacts
+lambda-deploy/*.zip
+lambda-deploy/__pycache__/
+lambda-deploy/.pytest_cache/
+lambda-deploy/.hypothesis/
+
+# Temporary and backup files
+*-temp.json
+*-backup.json
+cloudfront-function-arn.txt
+cloudfront-cache-policy-ids.json
+distribution-config-temp.json
+
+# Documentation temporales (mantener solo docs/ y README.md)
+/*-SUMMARY.md
+/*-COMPLETE.md
+/*-GUIDE.md
+/*-RESULTS.md
+/*-INSTRUCTIONS.md
+ACCION-INMEDIATA.md
+NEXT-STEPS.md
+TASK-*.md
+
+# Test artifacts
+.pytest_cache/
+.hypothesis/
+__pycache__/

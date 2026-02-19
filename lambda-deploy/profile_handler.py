@@ -67,7 +67,7 @@ def lambda_handler(event, context):
         path = event.get('requestContext', {}).get('http', {}).get('path', '')
         
         if path == '/profile' and http_method == 'GET':
-            return handle_get_profile(user_id, headers)
+            return handle_get_profile(user_id, headers, event)
         
         if path == '/profile' and http_method == 'PUT':
             return handle_update_profile(user_id, event, headers)
@@ -99,22 +99,64 @@ def lambda_handler(event, context):
             })
         }
 
-def handle_get_profile(user_id, headers):
-    """Handle GET /profile"""
+def handle_get_profile(user_id, headers, event=None):
+    """Handle GET /profile with idempotent profile creation"""
     try:
         response = users_table.get_item(Key={'userId': user_id})
         
         if 'Item' not in response:
-            return {
-                'statusCode': 404,
-                'headers': headers,
-                'body': json.dumps({
-                    'error': {
-                        'code': 'NOT_FOUND',
-                        'message': 'User profile not found'
-                    }
-                })
+            # Profile doesn't exist, create default profile from Cognito claims
+            print(f"Profile not found for user {user_id}, creating default profile")
+            
+            # Extract email and name from Cognito JWT claims
+            claims = event.get('requestContext', {}).get('authorizer', {}).get('jwt', {}).get('claims', {}) if event else {}
+            email = claims.get('email', '')
+            name = claims.get('name', email)  # Fallback to email if name not available
+            
+            # Create default profile
+            default_profile = {
+                'userId': user_id,
+                'email': email,
+                'nombre': name,
+                'apellido': '',
+                'phone': '',
+                'company': ''
             }
+            
+            # Idempotent put - only create if doesn't exist
+            try:
+                users_table.put_item(
+                    Item=default_profile,
+                    ConditionExpression='attribute_not_exists(userId)'
+                )
+                print(f"Default profile created for user {user_id}")
+                
+                return {
+                    'statusCode': 200,
+                    'headers': headers,
+                    'body': json.dumps(default_profile, default=str)
+                }
+                
+            except ClientError as e:
+                if e.response['Error']['Code'] == 'ConditionalCheckFailedException':
+                    # Profile was created by another concurrent request, fetch it
+                    print(f"Profile already exists for user {user_id}, fetching it")
+                    response = users_table.get_item(Key={'userId': user_id})
+                    
+                    if 'Item' in response:
+                        item = response['Item']
+                        for key, value in item.items():
+                            if value is None:
+                                item[key] = None
+                        
+                        return {
+                            'statusCode': 200,
+                            'headers': headers,
+                            'body': json.dumps(item, default=str)
+                        }
+                
+                # Re-raise if it's a different error
+                raise
         
         # Convert None values to null for JSON
         item = response['Item']
