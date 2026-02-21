@@ -131,20 +131,20 @@ Implementar un sistema completo de gestión de sesiones que resuelva el error "T
 
 ### 5. Mejoras en AuthProvider
 
-- [ ] 5.1 Agregar método público `checkSession()`
-  - [ ] 5.1.1 Implementar método en AuthProvider
-  - [ ] 5.1.2 Retornar estado actual de sesión
-  - [ ] 5.1.3 Exportar en AuthContextValue
+- [x] 5.1 Agregar método público `checkSession()`
+  - [x] 5.1.1 Implementar método en AuthProvider
+  - [x] 5.1.2 Retornar estado actual de sesión
+  - [x] 5.1.3 Exportar en AuthContextValue
 
-- [ ] 5.2 Mejorar manejo de errores
-  - [ ] 5.2.1 Distinguir entre sesión expirada y error de red
-  - [ ] 5.2.2 Agregar retry logic para errores de red
-  - [ ] 5.2.3 Mejorar mensajes de error
+- [x] 5.2 Mejorar manejo de errores
+  - [x] 5.2.1 Distinguir entre sesión expirada y error de red
+  - [x] 5.2.2 Agregar retry logic para errores de red
+  - [x] 5.2.3 Mejorar mensajes de error
 
-- [ ] 5.3 Testing de AuthProvider
-  - [ ] 5.3.1 Test: loadUser funciona correctamente
-  - [ ] 5.3.2 Test: Hub listeners funcionan
-  - [ ] 5.3.3 Test: checkSession retorna estado correcto
+- [x] 5.3 Testing de AuthProvider
+  - [x] 5.3.1 Test: loadUser funciona correctamente
+  - [x] 5.3.2 Test: Hub listeners funcionan
+  - [x] 5.3.3 Test: checkSession retorna estado correcto
 
 ---
 

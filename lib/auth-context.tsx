@@ -16,6 +16,90 @@ import {
 Amplify.configure(amplifyConfig, { ssr: false });
 
 /**
+ * Error types for better error handling
+ */
+enum AuthErrorType {
+  SESSION_EXPIRED = 'SESSION_EXPIRED',
+  NETWORK_ERROR = 'NETWORK_ERROR',
+  AUTHENTICATION_ERROR = 'AUTHENTICATION_ERROR',
+  UNKNOWN_ERROR = 'UNKNOWN_ERROR',
+}
+
+/**
+ * Classify error type based on error object
+ */
+function classifyError(error: any): AuthErrorType {
+  // Network errors
+  if (
+    error.message?.includes('Network') ||
+    error.message?.includes('network') ||
+    error.message?.includes('fetch') ||
+    error.name === 'NetworkError' ||
+    error.code === 'ECONNREFUSED' ||
+    error.code === 'ETIMEDOUT'
+  ) {
+    return AuthErrorType.NETWORK_ERROR;
+  }
+
+  // Session expired / authentication errors
+  if (
+    error.name === 'NotAuthorizedException' ||
+    error.name === 'UserUnAuthenticatedException' ||
+    error.message?.includes('expired') ||
+    error.message?.includes('Not authenticated')
+  ) {
+    return AuthErrorType.SESSION_EXPIRED;
+  }
+
+  // Other authentication errors
+  if (
+    error.name === 'InvalidPasswordException' ||
+    error.name === 'UserNotFoundException' ||
+    error.message?.includes('Invalid')
+  ) {
+    return AuthErrorType.AUTHENTICATION_ERROR;
+  }
+
+  return AuthErrorType.UNKNOWN_ERROR;
+}
+
+/**
+ * Retry function with exponential backoff
+ */
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  initialDelay: number = 1000
+): Promise<T> {
+  let lastError: any;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      const errorType = classifyError(error);
+
+      // Only retry network errors
+      if (errorType !== AuthErrorType.NETWORK_ERROR) {
+        throw error;
+      }
+
+      // Don't retry on last attempt
+      if (attempt === maxRetries - 1) {
+        throw error;
+      }
+
+      // Exponential backoff: 1s, 2s, 4s
+      const delay = initialDelay * Math.pow(2, attempt);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError;
+}
+
+/**
  * Authentication state
  */
 interface AuthState {
@@ -32,6 +116,7 @@ interface AuthContextValue extends AuthState {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  checkSession: () => Promise<boolean>;
 }
 
 /**
@@ -63,10 +148,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
    */
   const loadUser = useCallback(async () => {
     try {
-      const authenticated = await checkIsAuthenticated();
+      const authenticated = await retryWithBackoff(
+        () => checkIsAuthenticated(),
+        3,
+        1000
+      );
       
       if (authenticated) {
-        const user = await getCurrentUser();
+        const user = await retryWithBackoff(
+          () => getCurrentUser(),
+          3,
+          1000
+        );
         setState({
           user,
           isAuthenticated: true,
@@ -82,11 +175,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
         });
       }
     } catch (error) {
+      const errorType = classifyError(error);
+      let errorMessage = 'Failed to load user';
+
+      if (errorType === AuthErrorType.SESSION_EXPIRED) {
+        errorMessage = 'Sesión expirada';
+      } else if (errorType === AuthErrorType.NETWORK_ERROR) {
+        errorMessage = 'Error de conexión. Por favor verifica tu internet.';
+      } else if (errorType === AuthErrorType.AUTHENTICATION_ERROR) {
+        errorMessage = 'Error de autenticación';
+      }
+
       setState({
         user: null,
         isAuthenticated: false,
         isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to load user',
+        error: errorMessage,
       });
     }
   }, []);
@@ -150,11 +254,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
         error: null,
       });
     } catch (error) {
+      const errorType = classifyError(error);
+      let errorMessage = 'Login failed';
+
+      if (errorType === AuthErrorType.NETWORK_ERROR) {
+        errorMessage = 'Error de conexión. Por favor verifica tu internet.';
+      } else if (errorType === AuthErrorType.AUTHENTICATION_ERROR) {
+        errorMessage = error instanceof Error ? error.message : 'Credenciales inválidas';
+      } else {
+        errorMessage = error instanceof Error ? error.message : 'Error al iniciar sesión';
+      }
+
       setState({
         user: null,
         isAuthenticated: false,
         isLoading: false,
-        error: error instanceof Error ? error.message : 'Login failed',
+        error: errorMessage,
       });
       throw error;
     }
@@ -193,7 +308,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      const user = await getCurrentUser();
+      const user = await retryWithBackoff(
+        () => getCurrentUser(),
+        3,
+        1000
+      );
       setState({
         user,
         isAuthenticated: true,
@@ -201,13 +320,37 @@ export function AuthProvider({ children }: AuthProviderProps) {
         error: null,
       });
     } catch (error) {
+      const errorType = classifyError(error);
+      let errorMessage = 'Failed to refresh user';
+
+      if (errorType === AuthErrorType.SESSION_EXPIRED) {
+        errorMessage = 'Sesión expirada';
+      } else if (errorType === AuthErrorType.NETWORK_ERROR) {
+        errorMessage = 'Error de conexión. Por favor verifica tu internet.';
+      }
+
       setState({
         user: null,
         isAuthenticated: false,
         isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to refresh user',
+        error: errorMessage,
       });
       throw error;
+    }
+  }, []);
+
+  /**
+   * Check current session status
+   * Returns true if user is authenticated, false otherwise
+   * Does not modify state, only checks current authentication status
+   */
+  const checkSession = useCallback(async (): Promise<boolean> => {
+    try {
+      const authenticated = await checkIsAuthenticated();
+      return authenticated;
+    } catch (error) {
+      console.error('Error checking session:', error);
+      return false;
     }
   }, []);
 
@@ -216,6 +359,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     login,
     logout,
     refreshUser,
+    checkSession,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

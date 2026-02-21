@@ -18,7 +18,8 @@ const mockIsAuthenticated = authModule.isAuthenticated as jest.MockedFunction<
 
 // Test component that uses the auth hook
 function TestComponent() {
-  const { user, isAuthenticated, isLoading, error, login, logout, refreshUser } = useAuth();
+  const { user, isAuthenticated, isLoading, error, login, logout, refreshUser, checkSession } = useAuth();
+  const [sessionStatus, setSessionStatus] = React.useState<boolean | null>(null);
 
   const handleLogin = async () => {
     try {
@@ -44,15 +45,22 @@ function TestComponent() {
     }
   };
 
+  const handleCheckSession = async () => {
+    const status = await checkSession();
+    setSessionStatus(status);
+  };
+
   return (
     <div>
       <div data-testid="loading">{isLoading ? 'loading' : 'not-loading'}</div>
       <div data-testid="authenticated">{isAuthenticated ? 'authenticated' : 'not-authenticated'}</div>
       <div data-testid="user">{user ? user.email : 'no-user'}</div>
       <div data-testid="error">{error || 'no-error'}</div>
+      <div data-testid="session-status">{sessionStatus === null ? 'not-checked' : sessionStatus ? 'active' : 'inactive'}</div>
       <button onClick={handleLogin}>Login</button>
       <button onClick={handleLogout}>Logout</button>
       <button onClick={handleRefresh}>Refresh</button>
+      <button onClick={handleCheckSession}>Check Session</button>
     </div>
   );
 }
@@ -134,7 +142,7 @@ describe('AuthContext', () => {
 
       expect(screen.getByTestId('authenticated')).toHaveTextContent('not-authenticated');
       expect(screen.getByTestId('user')).toHaveTextContent('no-user');
-      expect(screen.getByTestId('error')).toHaveTextContent('Session expired. Please login again.');
+      expect(screen.getByTestId('error')).toHaveTextContent('Sesión expirada');
     });
   });
 
@@ -380,7 +388,7 @@ describe('AuthContext', () => {
       });
 
       expect(screen.getByTestId('user')).toHaveTextContent('no-user');
-      expect(screen.getByTestId('error')).toHaveTextContent('Session expired. Please login again.');
+      expect(screen.getByTestId('error')).toHaveTextContent('Sesión expirada');
     });
   });
 
@@ -418,7 +426,7 @@ describe('AuthContext', () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByTestId('error')).toHaveTextContent('Login failed');
+        expect(screen.getByTestId('error')).toHaveTextContent('Error al iniciar sesión');
       });
     });
 
@@ -569,6 +577,233 @@ describe('AuthContext', () => {
 
       // Should not show error
       expect(screen.getByTestId('error')).toHaveTextContent('no-error');
+    });
+  });
+
+  describe('checkSession method', () => {
+    it('should return true when user is authenticated', async () => {
+      mockIsAuthenticated.mockResolvedValue(true);
+
+      render(
+        <AuthProvider>
+          <TestComponent />
+        </AuthProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('loading')).toHaveTextContent('not-loading');
+      });
+
+      const checkButton = screen.getByText('Check Session');
+      await act(async () => {
+        checkButton.click();
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('session-status')).toHaveTextContent('active');
+      });
+
+      expect(mockIsAuthenticated).toHaveBeenCalled();
+    });
+
+    it('should return false when user is not authenticated', async () => {
+      mockIsAuthenticated.mockResolvedValue(false);
+
+      render(
+        <AuthProvider>
+          <TestComponent />
+        </AuthProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('loading')).toHaveTextContent('not-loading');
+      });
+
+      const checkButton = screen.getByText('Check Session');
+      await act(async () => {
+        checkButton.click();
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('session-status')).toHaveTextContent('inactive');
+      });
+    });
+
+    it('should return false on error without modifying state', async () => {
+      const mockUser = {
+        userId: 'user-123',
+        email: 'test@example.com',
+        emailVerified: true,
+      };
+
+      mockIsAuthenticated.mockResolvedValueOnce(true);
+      mockGetCurrentUser.mockResolvedValue(mockUser);
+
+      render(
+        <AuthProvider>
+          <TestComponent />
+        </AuthProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('authenticated')).toHaveTextContent('authenticated');
+      });
+
+      // Now make checkSession fail
+      mockIsAuthenticated.mockRejectedValueOnce(new Error('Network error'));
+
+      const checkButton = screen.getByText('Check Session');
+      await act(async () => {
+        checkButton.click();
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('session-status')).toHaveTextContent('inactive');
+      });
+
+      // State should remain unchanged
+      expect(screen.getByTestId('authenticated')).toHaveTextContent('authenticated');
+      expect(screen.getByTestId('user')).toHaveTextContent('test@example.com');
+    });
+  });
+
+  describe('error classification and retry logic', () => {
+    it('should show network error message for network failures', async () => {
+      mockIsAuthenticated.mockReturnValue(false);
+      const networkError = new Error('Network request failed');
+      networkError.name = 'NetworkError';
+      mockLoginUser.mockRejectedValue(networkError);
+
+      render(
+        <AuthProvider>
+          <TestComponent />
+        </AuthProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('loading')).toHaveTextContent('not-loading');
+      });
+
+      const loginButton = screen.getByText('Login');
+      await act(async () => {
+        loginButton.click();
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('error')).toHaveTextContent('Error de conexión. Por favor verifica tu internet.');
+      });
+    });
+
+    it('should show session expired message for auth errors', async () => {
+      const mockUser = {
+        userId: 'user-123',
+        email: 'test@example.com',
+        emailVerified: true,
+      };
+
+      mockIsAuthenticated.mockResolvedValueOnce(true);
+      mockGetCurrentUser.mockResolvedValueOnce(mockUser);
+
+      render(
+        <AuthProvider>
+          <TestComponent />
+        </AuthProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('authenticated')).toHaveTextContent('authenticated');
+      });
+
+      // Simulate session expiration on refresh
+      const authError = new Error('Token expired');
+      authError.name = 'NotAuthorizedException';
+      mockGetCurrentUser.mockRejectedValueOnce(authError);
+
+      const refreshButton = screen.getByText('Refresh');
+      await act(async () => {
+        refreshButton.click();
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('error')).toHaveTextContent('Sesión expirada');
+      });
+    });
+
+    it('should retry network errors during loadUser', async () => {
+      const networkError = new Error('Network request failed');
+      networkError.name = 'NetworkError';
+
+      // Track call count
+      let callCount = 0;
+      mockIsAuthenticated.mockImplementation(() => {
+        callCount++;
+        return Promise.reject(networkError);
+      });
+
+      render(
+        <AuthProvider>
+          <TestComponent />
+        </AuthProvider>
+      );
+
+      // Wait for loading to finish (after all retries)
+      await waitFor(() => {
+        expect(screen.getByTestId('loading')).toHaveTextContent('not-loading');
+      }, { timeout: 15000 });
+
+      // Should have retried 3 times
+      expect(callCount).toBe(3);
+      expect(screen.getByTestId('error')).toHaveTextContent('Error de conexión. Por favor verifica tu internet.');
+    });
+
+    it('should not retry authentication errors', async () => {
+      const authError = new Error('Invalid credentials');
+      authError.name = 'NotAuthorizedException';
+
+      let callCount = 0;
+      mockIsAuthenticated.mockImplementation(() => {
+        callCount++;
+        return Promise.reject(authError);
+      });
+
+      render(
+        <AuthProvider>
+          <TestComponent />
+        </AuthProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('loading')).toHaveTextContent('not-loading');
+      }, { timeout: 5000 });
+
+      // Should only try once for auth errors
+      expect(callCount).toBe(1);
+      expect(screen.getByTestId('error')).toHaveTextContent('Sesión expirada');
+    });
+
+    it('should give up after max retries for network errors', async () => {
+      const networkError = new Error('Network request failed');
+      networkError.name = 'NetworkError';
+
+      let callCount = 0;
+      mockIsAuthenticated.mockImplementation(() => {
+        callCount++;
+        return Promise.reject(networkError);
+      });
+
+      render(
+        <AuthProvider>
+          <TestComponent />
+        </AuthProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('loading')).toHaveTextContent('not-loading');
+      }, { timeout: 15000 });
+
+      // Should try 3 times (initial + 2 retries)
+      expect(callCount).toBe(3);
+      expect(screen.getByTestId('error')).toHaveTextContent('Error de conexión. Por favor verifica tu internet.');
     });
   });
 });
