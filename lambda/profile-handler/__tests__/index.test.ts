@@ -1,8 +1,12 @@
-import { handler } from '../index';
 import { mockClient } from 'aws-sdk-client-mock';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { APIGatewayProxyEvent } from 'aws-lambda';
+
+// Set environment variable BEFORE importing the handler
+process.env.S3_BUCKET = 'polizalab-profile-images';
+
+import { handler } from '../index';
 
 // Mock AWS SDK clients
 const ddbMock = mockClient(DynamoDBDocumentClient);
@@ -204,6 +208,132 @@ describe('Profile Handler Lambda', () => {
       expect(result.statusCode).toBe(401);
       const body = JSON.parse(result.body);
       expect(body.error.code).toBe('AUTH_REQUIRED');
+    });
+
+    it('should update profile with profileImageUrl', async () => {
+      ddbMock.on(UpdateCommand).resolves({});
+
+      const event = createMockEvent('/profile', 'PUT', {
+        profileImageUrl: 'https://polizalab-profile-images.s3.amazonaws.com/profiles/test-user-123/avatar.jpg',
+      });
+
+      const result = await handler(event);
+
+      expect(result.statusCode).toBe(200);
+      const body = JSON.parse(result.body);
+      expect(body.success).toBe(true);
+    });
+
+    it('should update profile with nombre and profileImageUrl', async () => {
+      ddbMock.on(UpdateCommand).resolves({});
+
+      const event = createMockEvent('/profile', 'PUT', {
+        nombre: 'Carlos',
+        profileImageUrl: 'https://polizalab-profile-images.s3.us-east-1.amazonaws.com/profiles/test-user-123/avatar.jpg',
+      });
+
+      const result = await handler(event);
+
+      expect(result.statusCode).toBe(200);
+      const body = JSON.parse(result.body);
+      expect(body.success).toBe(true);
+    });
+
+    it('should reject invalid S3 URL (wrong bucket)', async () => {
+      const event = createMockEvent('/profile', 'PUT', {
+        profileImageUrl: 'https://wrong-bucket.s3.amazonaws.com/profiles/test-user-123/avatar.jpg',
+      });
+
+      const result = await handler(event);
+
+      expect(result.statusCode).toBe(400);
+      const body = JSON.parse(result.body);
+      expect(body.error.code).toBe('VALIDATION_ERROR');
+      expect(body.error.message).toContain('Invalid profileImageUrl');
+    });
+
+    it('should reject invalid S3 URL (not S3)', async () => {
+      const event = createMockEvent('/profile', 'PUT', {
+        profileImageUrl: 'https://example.com/image.jpg',
+      });
+
+      const result = await handler(event);
+
+      expect(result.statusCode).toBe(400);
+      const body = JSON.parse(result.body);
+      expect(body.error.code).toBe('VALIDATION_ERROR');
+      expect(body.error.message).toContain('Invalid profileImageUrl');
+    });
+
+    it('should reject malformed URL', async () => {
+      const event = createMockEvent('/profile', 'PUT', {
+        profileImageUrl: 'not-a-valid-url',
+      });
+
+      const result = await handler(event);
+
+      expect(result.statusCode).toBe(400);
+      const body = JSON.parse(result.body);
+      expect(body.error.code).toBe('VALIDATION_ERROR');
+      expect(body.error.message).toContain('Invalid profileImageUrl');
+    });
+
+    it('should accept S3 path-style URL', async () => {
+      ddbMock.on(UpdateCommand).resolves({});
+
+      const event = createMockEvent('/profile', 'PUT', {
+        profileImageUrl: 'https://s3.amazonaws.com/polizalab-profile-images/profiles/test-user-123/avatar.jpg',
+      });
+
+      const result = await handler(event);
+
+      expect(result.statusCode).toBe(200);
+      const body = JSON.parse(result.body);
+      expect(body.success).toBe(true);
+    });
+
+    it('should accept S3 regional path-style URL', async () => {
+      ddbMock.on(UpdateCommand).resolves({});
+
+      const event = createMockEvent('/profile', 'PUT', {
+        profileImageUrl: 'https://s3.us-east-1.amazonaws.com/polizalab-profile-images/profiles/test-user-123/avatar.jpg',
+      });
+
+      const result = await handler(event);
+
+      expect(result.statusCode).toBe(200);
+      const body = JSON.parse(result.body);
+      expect(body.success).toBe(true);
+    });
+
+    it('should allow empty string for profileImageUrl (to clear it)', async () => {
+      ddbMock.on(UpdateCommand).resolves({});
+
+      const event = createMockEvent('/profile', 'PUT', {
+        nombre: 'Carlos',
+        profileImageUrl: '',
+      });
+
+      const result = await handler(event);
+
+      expect(result.statusCode).toBe(200);
+      const body = JSON.parse(result.body);
+      expect(body.success).toBe(true);
+    });
+
+    it('should allow null for profileImageUrl (to clear it)', async () => {
+      ddbMock.on(UpdateCommand).resolves({});
+
+      const event = createMockEvent('/profile', 'PUT', {
+        nombre: 'Carlos',
+        profileImageUrl: null,
+      });
+
+      const result = await handler(event);
+
+      expect(result.statusCode).toBe(200);
+      const body = JSON.parse(result.body);
+      expect(body.success).toBe(true);
     });
   });
 

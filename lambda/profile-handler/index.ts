@@ -15,6 +15,7 @@ const PRESIGNED_URL_EXPIRATION = 300; // 5 minutes
 interface UpdateProfileRequestBody {
   nombre?: string;
   apellido?: string;
+  profileImageUrl?: string;
 }
 
 interface ProfileImageRequestBody {
@@ -121,13 +122,19 @@ async function handleGetProfile(userId: string): Promise<APIGatewayProxyResult> 
 
     console.log('Profile retrieved successfully', { userId });
 
+    // Convert profileImage S3 key to full URL if it exists
+    const profileData = { ...result.Item };
+    if (profileData.profileImage) {
+      profileData.profileImageUrl = `https://${S3_BUCKET}.s3.amazonaws.com/${profileData.profileImage}`;
+    }
+
     return {
       statusCode: 200,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
       },
-      body: JSON.stringify(result.Item),
+      body: JSON.stringify(profileData),
     };
   } catch (error: any) {
     console.error('Error in handleGetProfile', error);
@@ -156,12 +163,27 @@ async function handleUpdateProfile(
     const body: UpdateProfileRequestBody = JSON.parse(event.body);
 
     // Validate that at least one field is provided
-    if (!body.nombre && !body.apellido) {
+    if (!body.nombre && !body.apellido && !body.profileImageUrl) {
       return createErrorResponse(
         400,
         'VALIDATION_ERROR',
-        'At least one field (nombre or apellido) is required'
+        'At least one field (nombre, apellido, or profileImageUrl) is required'
       );
+    }
+
+    // Validate profileImageUrl if provided
+    if (body.profileImageUrl !== undefined && body.profileImageUrl !== null && body.profileImageUrl !== '') {
+      const isValidS3Url = validateS3Url(body.profileImageUrl, S3_BUCKET);
+      if (!isValidS3Url) {
+        return createErrorResponse(
+          400,
+          'VALIDATION_ERROR',
+          'Invalid profileImageUrl. Must be a valid S3 URL from the configured bucket',
+          {
+            profileImageUrl: `Must be a URL from bucket: ${S3_BUCKET}`,
+          }
+        );
+      }
     }
 
     console.log('Updating profile', { userId, updates: body });
@@ -181,6 +203,12 @@ async function handleUpdateProfile(
       updateExpressions.push('#apellido = :apellido');
       expressionAttributeNames['#apellido'] = 'apellido';
       expressionAttributeValues[':apellido'] = body.apellido;
+    }
+
+    if (body.profileImageUrl !== undefined) {
+      updateExpressions.push('#profileImageUrl = :profileImageUrl');
+      expressionAttributeNames['#profileImageUrl'] = 'profileImageUrl';
+      expressionAttributeValues[':profileImageUrl'] = body.profileImageUrl;
     }
 
     await docClient.send(
@@ -317,6 +345,47 @@ async function handleGetImageUploadUrl(
     }
 
     return createErrorResponse(500, 'INTERNAL_ERROR', 'Failed to generate upload URL');
+  }
+}
+
+/**
+ * Validate S3 URL
+ * Ensures the URL is from the expected S3 bucket
+ */
+function validateS3Url(url: string, expectedBucket: string): boolean {
+  try {
+    // Check if it's a valid URL
+    const parsedUrl = new URL(url);
+    
+    // Accept S3 URLs in these formats:
+    // 1. https://bucket-name.s3.amazonaws.com/key
+    // 2. https://bucket-name.s3.region.amazonaws.com/key
+    // 3. https://s3.amazonaws.com/bucket-name/key
+    // 4. https://s3.region.amazonaws.com/bucket-name/key
+    
+    const hostname = parsedUrl.hostname;
+    
+    // Format 1 & 2: bucket-name.s3[.region].amazonaws.com
+    if (hostname.startsWith(`${expectedBucket}.s3.`) && hostname.endsWith('.amazonaws.com')) {
+      return true;
+    }
+    
+    if (hostname === `${expectedBucket}.s3.amazonaws.com`) {
+      return true;
+    }
+    
+    // Format 3 & 4: s3[.region].amazonaws.com/bucket-name/...
+    if ((hostname.startsWith('s3.') || hostname === 's3.amazonaws.com') && 
+        hostname.endsWith('.amazonaws.com')) {
+      const pathParts = parsedUrl.pathname.split('/').filter(p => p);
+      if (pathParts.length > 0 && pathParts[0] === expectedBucket) {
+        return true;
+      }
+    }
+    
+    return false;
+  } catch {
+    return false;
   }
 }
 

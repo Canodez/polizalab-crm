@@ -119,6 +119,7 @@ export const profileApi = {
       nombre: string | null;
       apellido: string | null;
       profileImage: string | null;
+      profileImageUrl: string | null;
       createdAt: string;
     }>('/profile');
   },
@@ -126,7 +127,11 @@ export const profileApi = {
   /**
    * Update user profile
    */
-  async updateProfile(data: { nombre: string; apellido: string }) {
+  async updateProfile(data: { 
+    nombre?: string; 
+    apellido?: string;
+    profileImageUrl?: string;
+  }) {
     return apiRequest<{ success: boolean }>('/profile', {
       method: 'PUT',
       body: JSON.stringify(data),

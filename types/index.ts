@@ -4,7 +4,8 @@ export interface User {
   email: string;
   nombre: string | null;
   apellido: string | null;
-  profileImage: string | null;
+  profileImage: string | null; // S3 key (e.g., profiles/{userId}/{filename})
+  profileImageUrl: string | null; // Full URL to access the image
   createdAt: string;
 }
 

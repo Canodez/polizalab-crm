@@ -1,9 +1,10 @@
 'use client';
 
 import { Menu, Transition } from '@headlessui/react';
-import { Fragment } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { profileApi } from '@/lib/api-client';
 import Avatar from './Avatar';
 import {
   UserCircleIcon,
@@ -19,6 +20,24 @@ import {
 export default function UserMenu() {
   const { user, logout } = useAuth();
   const router = useRouter();
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+
+  // Load profile image URL
+  useEffect(() => {
+    const loadProfileImage = async () => {
+      try {
+        const profile = await profileApi.getProfile();
+        setProfileImageUrl(profile.profileImageUrl || null);
+      } catch (error) {
+        // Silently fail - user will see initials instead
+        console.error('Failed to load profile image:', error);
+      }
+    };
+
+    if (user) {
+      loadProfileImage();
+    }
+  }, [user]);
 
   const handleLogout = async () => {
     try {
@@ -33,7 +52,7 @@ export default function UserMenu() {
     <Menu as="div" className="relative inline-block text-left">
       {/* Menu button with user avatar */}
       <Menu.Button className="focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-full">
-        <Avatar email={user?.email || ''} size="md" />
+        <Avatar email={user?.email || ''} imageUrl={profileImageUrl} size="md" />
       </Menu.Button>
 
       {/* Animated dropdown menu */}

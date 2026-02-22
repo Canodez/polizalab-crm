@@ -152,61 +152,61 @@ Implementar un sistema completo de gestión de sesiones que resuelva el error "T
 
 ### 6. Foto de Perfil con Upload a S3
 
-- [ ] 6.1 Diseñar UI de foto de perfil
-  - [ ] 6.1.1 Crear sección header en página de perfil
-  - [ ] 6.1.2 Avatar grande (120px x 120px)
-  - [ ] 6.1.3 Botón "Cambiar foto"
-  - [ ] 6.1.4 Mostrar nombre y email del usuario
+- [x] 6.1 Diseñar UI de foto de perfil
+  - [x] 6.1.1 Crear sección header en página de perfil
+  - [x] 6.1.2 Avatar grande (120px x 120px)
+  - [x] 6.1.3 Botón "Cambiar foto"
+  - [x] 6.1.4 Mostrar nombre y email del usuario
 
-- [ ] 6.2 Implementar file picker
-  - [ ] 6.2.1 Instalar `react-dropzone`
-  - [ ] 6.2.2 Configurar accept: image/jpeg, image/png
-  - [ ] 6.2.3 Validar tamaño máximo (2MB)
-  - [ ] 6.2.4 Mostrar errores de validación
+- [x] 6.2 Implementar file picker
+  - [x] 6.2.1 Instalar `react-dropzone`
+  - [x] 6.2.2 Configurar accept: image/jpeg, image/png
+  - [x] 6.2.3 Validar tamaño máximo (2MB)
+  - [x] 6.2.4 Mostrar errores de validación
 
-- [ ] 6.3 Implementar preview de imagen
-  - [ ] 6.3.1 Crear componente ImagePreview
-  - [ ] 6.3.2 Mostrar imagen seleccionada
-  - [ ] 6.3.3 Botones "Guardar" y "Cancelar"
-  - [ ] 6.3.4 Crop/resize opcional
+- [x] 6.3 Implementar preview de imagen
+  - [x] 6.3.1 Crear componente ImagePreview
+  - [x] 6.3.2 Mostrar imagen seleccionada
+  - [x] 6.3.3 Botones "Guardar" y "Cancelar"
+  - [x] 6.3.4 Crop/resize opcional
 
-- [ ] 6.4 Crear Lambda para pre-signed URLs
-  - [ ] 6.4.1 Crear `lambda/profile-image-upload/index.ts`
-  - [ ] 6.4.2 Generar pre-signed URL para S3
-  - [ ] 6.4.3 Validar usuario autenticado
-  - [ ] 6.4.4 Configurar CORS
-  - [ ] 6.4.5 Deploy Lambda
+- [x] 6.4 Crear Lambda para pre-signed URLs
+  - [x] 6.4.1 Crear `lambda/profile-image-upload/index.ts`
+  - [x] 6.4.2 Generar pre-signed URL para S3
+  - [x] 6.4.3 Validar usuario autenticado
+  - [x] 6.4.4 Configurar CORS
+  - [x] 6.4.5 Deploy Lambda
 
-- [ ] 6.5 Crear S3 bucket para fotos
-  - [ ] 6.5.1 Crear bucket `polizalab-profile-images`
-  - [ ] 6.5.2 Configurar bucket policy
-  - [ ] 6.5.3 Habilitar CORS
-  - [ ] 6.5.4 Configurar lifecycle rules (opcional)
+- [x] 6.5 Crear S3 bucket para fotos
+  - [x] 6.5.1 Crear bucket `polizalab-profile-images`
+  - [x] 6.5.2 Configurar bucket policy
+  - [x] 6.5.3 Habilitar CORS
+  - [x] 6.5.4 Configurar lifecycle rules (opcional)
 
-- [ ] 6.6 Implementar upload a S3
-  - [ ] 6.6.1 Request pre-signed URL a Lambda
-  - [ ] 6.6.2 Upload imagen a S3 con pre-signed URL
-  - [ ] 6.6.3 Mostrar progress bar
-  - [ ] 6.6.4 Manejar errores de upload
+- [x] 6.6 Implementar upload a S3
+  - [x] 6.6.1 Request pre-signed URL a Lambda
+  - [x] 6.6.2 Upload imagen a S3 con pre-signed URL
+  - [x] 6.6.3 Mostrar progress bar
+  - [x] 6.6.4 Manejar errores de upload
 
-- [ ] 6.7 Guardar URL en DynamoDB
-  - [ ] 6.7.1 Agregar campo `profileImageUrl` a tabla profiles
-  - [ ] 6.7.2 Actualizar profile_handler.py
-  - [ ] 6.7.3 Endpoint PUT /profile con imageUrl
-  - [ ] 6.7.4 Validar URL de S3
+- [x] 6.7 Guardar URL en DynamoDB
+  - [x] 6.7.1 Agregar campo `profileImageUrl` a tabla profiles
+  - [x] 6.7.2 Actualizar profile_handler.py
+  - [x] 6.7.3 Endpoint PUT /profile con imageUrl
+  - [x] 6.7.4 Validar URL de S3
 
-- [ ] 6.8 Mostrar foto de perfil
-  - [ ] 6.8.1 Cargar URL desde API
-  - [ ] 6.8.2 Mostrar en Avatar grande
-  - [ ] 6.8.3 Mostrar en UserMenu (avatar pequeño)
-  - [ ] 6.8.4 Fallback a iniciales si no hay foto
+- [x] 6.8 Mostrar foto de perfil
+  - [x] 6.8.1 Cargar URL desde API
+  - [x] 6.8.2 Mostrar en Avatar grande
+  - [x] 6.8.3 Mostrar en UserMenu (avatar pequeño)
+  - [x] 6.8.4 Fallback a iniciales si no hay foto
 
-- [ ] 6.9 Testing de foto de perfil
-  - [ ] 6.9.1 Test: File picker valida correctamente
-  - [ ] 6.9.2 Test: Preview muestra imagen
-  - [ ] 6.9.3 Test: Upload a S3 funciona
-  - [ ] 6.9.4 Test: URL se guarda en DynamoDB
-  - [ ] 6.9.5 Test: Foto se muestra correctamente
+- [x] 6.9 Testing de foto de perfil
+  - [x] 6.9.1 Test: File picker valida correctamente
+  - [x] 6.9.2 Test: Preview muestra imagen
+  - [x] 6.9.3 Test: Upload a S3 funciona
+  - [x] 6.9.4 Test: URL se guarda en DynamoDB
+  - [x] 6.9.5 Test: Foto se muestra correctamente
 
 ### 7. Información de Cuenta (Solo Lectura)
 
