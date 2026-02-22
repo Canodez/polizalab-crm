@@ -585,7 +585,7 @@ export default function ProfilePage() {
                 <div className="flex items-center gap-2 text-sm text-zinc-600">
                   <CalendarIcon className="h-4 w-4" />
                   <span>
-                    {format(new Date(profile.createdAt), 'd MMM yyyy', { locale: es })}
+                    {profile.createdAt && format(new Date(profile.createdAt), 'd MMM yyyy', { locale: es })}
                   </span>
                 </div>
               </div>
