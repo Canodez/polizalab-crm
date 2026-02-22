@@ -483,7 +483,7 @@ export default function ProfilePage() {
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
                 disabled={!isEditing}
-                className="w-full rounded-lg border border-zinc-300 px-4 py-3 disabled:bg-zinc-100 disabled:text-zinc-500"
+                className="w-full rounded-lg border border-zinc-300 px-4 py-3 text-zinc-900 disabled:bg-zinc-100 disabled:text-zinc-500"
                 style={{ minHeight: '44px' }}
               />
             </div>
@@ -497,7 +497,7 @@ export default function ProfilePage() {
                 value={apellido}
                 onChange={(e) => setApellido(e.target.value)}
                 disabled={!isEditing}
-                className="w-full rounded-lg border border-zinc-300 px-4 py-3 disabled:bg-zinc-100 disabled:text-zinc-500"
+                className="w-full rounded-lg border border-zinc-300 px-4 py-3 text-zinc-900 disabled:bg-zinc-100 disabled:text-zinc-500"
                 style={{ minHeight: '44px' }}
               />
             </div>
@@ -580,15 +580,25 @@ export default function ProfilePage() {
               </div>
 
               {/* Registration Date */}
-              <div className="flex items-center justify-between py-3 border-b border-zinc-200">
-                <span className="text-sm font-medium text-zinc-700">Fecha de registro</span>
-                <div className="flex items-center gap-2 text-sm text-zinc-600">
-                  <CalendarIcon className="h-4 w-4" />
-                  <span>
-                    {profile.createdAt && format(new Date(profile.createdAt), 'd MMM yyyy', { locale: es })}
-                  </span>
+              {profile.createdAt ? (
+                <div className="flex items-center justify-between py-3 border-b border-zinc-200">
+                  <span className="text-sm font-medium text-zinc-700">Fecha de registro</span>
+                  <div className="flex items-center gap-2 text-sm text-zinc-600">
+                    <CalendarIcon className="h-4 w-4" />
+                    <span>
+                      {format(new Date(profile.createdAt), 'd MMM yyyy', { locale: es })}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="flex items-center justify-between py-3 border-b border-zinc-200">
+                  <span className="text-sm font-medium text-zinc-700">Fecha de registro</span>
+                  <div className="flex items-center gap-2 text-sm text-zinc-500 italic">
+                    <CalendarIcon className="h-4 w-4" />
+                    <span>No disponible</span>
+                  </div>
+                </div>
+              )}
 
               {/* Last Login */}
               {profile.lastLoginAt && (
