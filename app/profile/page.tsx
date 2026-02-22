@@ -3,11 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
+import { format, formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { useAuth } from '@/lib/auth-context';
 import { profileApi, ApiError } from '@/lib/api-client';
 import UserMenu from '@/components/UserMenu';
 import ImagePreview from '@/components/ImagePreview';
-import { PhotoIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { PhotoIcon, XMarkIcon, InformationCircleIcon, CalendarIcon, EyeIcon, EyeSlashIcon, ClipboardDocumentIcon, CheckIcon } from '@heroicons/react/24/outline';
 
 interface ProfileData {
   userId: string;
@@ -17,6 +19,7 @@ interface ProfileData {
   profileImage: string | null;
   profileImageUrl: string | null;
   createdAt: string;
+  lastLoginAt?: string;
 }
 
 export default function ProfilePage() {
@@ -38,6 +41,10 @@ export default function ProfilePage() {
   
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  
+  // User ID visibility and copy state
+  const [showUserId, setShowUserId] = useState(false);
+  const [userIdCopied, setUserIdCopied] = useState(false);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -95,20 +102,16 @@ export default function ProfilePage() {
     try {
       setIsUploadingImage(true);
       setError('');
-      await uploadProfileImage(selectedFile);
       
-      // Update profile to save the image URL
-      await profileApi.updateProfile({
-        nombre: nombre.trim() || profile?.nombre || '',
-        apellido: apellido.trim() || profile?.apellido || '',
-      });
+      // Upload image (backend automatically saves metadata to DynamoDB)
+      await uploadProfileImage(selectedFile);
       
       setSuccess('Imagen de perfil actualizada correctamente');
       setShowImagePreview(false);
       setSelectedFile(null);
       setImagePreview(null);
       
-      // Reload profile to get updated data
+      // Reload profile to get updated image URL
       await loadProfile();
     } catch (err) {
       if (err instanceof ApiError) {
@@ -129,6 +132,27 @@ export default function ProfilePage() {
     setShowImagePreview(false);
     setSelectedFile(null);
     setImagePreview(null);
+  };
+
+  const handleToggleUserId = () => {
+    setShowUserId(!showUserId);
+  };
+
+  const handleCopyUserId = async () => {
+    if (!user?.userId) return;
+    
+    try {
+      await navigator.clipboard.writeText(user.userId);
+      setUserIdCopied(true);
+      
+      // Reset copied state after 2 seconds
+      setTimeout(() => {
+        setUserIdCopied(false);
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to copy user ID:', err);
+      setError('Error al copiar el ID de usuario');
+    }
   };
 
   const handleSave = async () => {
@@ -224,15 +248,14 @@ export default function ProfilePage() {
       
       // Get pre-signed URL
       let presignedUrl: string;
-      let s3Key: string;
       
       try {
         const response = await profileApi.getImageUploadUrl(
           file.name,
-          file.type
+          file.type  // This is the contentType
         );
         presignedUrl = response.presignedUrl;
-        s3Key = response.s3Key;
+        // Note: s3Key is already saved in DynamoDB by the backend
       } catch (err) {
         if (err instanceof ApiError) {
           if (err.statusCode === 401) {
@@ -290,6 +313,7 @@ export default function ProfilePage() {
         
         // Open and send request
         xhr.open('PUT', presignedUrl);
+        // CRITICAL: Content-Type must match the one used in presigned URL generation
         xhr.setRequestHeader('Content-Type', file.type);
         xhr.send(file);
       });
@@ -411,22 +435,15 @@ export default function ProfilePage() {
                 <h1 className="text-3xl font-bold text-zinc-900 mb-2">
                   {nombre && apellido ? `${nombre} ${apellido}` : 'Mi Perfil'}
                 </h1>
-                <p className="text-lg text-zinc-600 mb-4">
+                <p className="text-lg text-zinc-600">
                   {profile.email}
                 </p>
-                <div className="text-sm text-zinc-500">
-                  Miembro desde {new Date(profile.createdAt).toLocaleDateString('es-ES', { 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                  })}
-                </div>
               </div>
             </div>
           </div>
 
           {/* Profile Information Card */}
-          <div className="rounded-lg bg-white p-6 shadow-sm">
+          <div className="rounded-lg bg-white p-6 shadow-sm mb-6">
             <h2 className="text-xl font-semibold text-zinc-900 mb-6">Información Personal</h2>
 
           {/* Error Message */}
@@ -526,6 +543,108 @@ export default function ProfilePage() {
               </>
             )}
           </div>
+          </div>
+
+          {/* Account Information Card */}
+          <div className="rounded-lg bg-white p-6 shadow-sm">
+            <div className="flex items-center gap-3 mb-6">
+              <InformationCircleIcon className="h-6 w-6 text-blue-600" />
+              <h2 className="text-xl font-semibold text-zinc-900">Información de Cuenta</h2>
+            </div>
+            
+            {/* Email Verification Status */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between py-3 border-b border-zinc-200">
+                <span className="text-sm font-medium text-zinc-700">Email verificado</span>
+                <div className="flex items-center gap-2">
+                  {user?.emailVerified ? (
+                    <>
+                      <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-800">
+                        <svg className="mr-1.5 h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        Sí
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-800">
+                        <svg className="mr-1.5 h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
+                        No
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Registration Date */}
+              <div className="flex items-center justify-between py-3 border-b border-zinc-200">
+                <span className="text-sm font-medium text-zinc-700">Fecha de registro</span>
+                <div className="flex items-center gap-2 text-sm text-zinc-600">
+                  <CalendarIcon className="h-4 w-4" />
+                  <span>
+                    {format(new Date(profile.createdAt), 'd MMM yyyy', { locale: es })}
+                  </span>
+                </div>
+              </div>
+
+              {/* Last Login */}
+              {profile.lastLoginAt && (
+                <div className="flex items-center justify-between py-3 border-b border-zinc-200">
+                  <span className="text-sm font-medium text-zinc-700">Último inicio de sesión</span>
+                  <div className="flex items-center gap-2 text-sm text-zinc-600">
+                    <CalendarIcon className="h-4 w-4" />
+                    <span>
+                      {formatDistanceToNow(new Date(profile.lastLoginAt), { 
+                        addSuffix: true, 
+                        locale: es 
+                      })}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* User ID */}
+              <div className="flex items-center justify-between py-3">
+                <span className="text-sm font-medium text-zinc-700">ID de usuario</span>
+                <div className="flex items-center gap-2">
+                  {/* User ID Display */}
+                  <span className="text-sm font-mono text-zinc-600">
+                    {showUserId ? user?.userId : '••••••••••••••••'}
+                  </span>
+                  
+                  {/* Show/Hide Button */}
+                  <button
+                    onClick={handleToggleUserId}
+                    className="rounded p-1.5 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
+                    aria-label={showUserId ? 'Ocultar ID de usuario' : 'Mostrar ID de usuario'}
+                    title={showUserId ? 'Ocultar' : 'Mostrar'}
+                  >
+                    {showUserId ? (
+                      <EyeSlashIcon className="h-4 w-4" />
+                    ) : (
+                      <EyeIcon className="h-4 w-4" />
+                    )}
+                  </button>
+                  
+                  {/* Copy Button */}
+                  <button
+                    onClick={handleCopyUserId}
+                    className="rounded p-1.5 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
+                    aria-label="Copiar ID de usuario"
+                    title="Copiar"
+                  >
+                    {userIdCopied ? (
+                      <CheckIcon className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <ClipboardDocumentIcon className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

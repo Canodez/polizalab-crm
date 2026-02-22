@@ -210,36 +210,36 @@ Implementar un sistema completo de gestión de sesiones que resuelva el error "T
 
 ### 7. Información de Cuenta (Solo Lectura)
 
-- [ ] 7.1 Crear sección "Información de Cuenta"
-  - [ ] 7.1.1 Diseñar card con título e icono
-  - [ ] 7.1.2 Agregar a página de perfil
+- [x] 7.1 Crear sección "Información de Cuenta"
+  - [x] 7.1.1 Diseñar card con título e icono
+  - [x] 7.1.2 Agregar a página de perfil
 
-- [ ] 7.2 Mostrar email verificado
-  - [ ] 7.2.1 Obtener `email_verified` de Cognito
-  - [ ] 7.2.2 Mostrar badge verde (✓) o rojo (✗)
-  - [ ] 7.2.3 Texto "Email verificado: Sí/No"
+- [x] 7.2 Mostrar email verificado
+  - [x] 7.2.1 Obtener `email_verified` de Cognito
+  - [x] 7.2.2 Mostrar badge verde (✓) o rojo (✗)
+  - [x] 7.2.3 Texto "Email verificado: Sí/No"
 
-- [ ] 7.3 Mostrar fecha de registro
-  - [ ] 7.3.1 Obtener `createdAt` de DynamoDB
-  - [ ] 7.3.2 Formatear con date-fns
-  - [ ] 7.3.3 Mostrar "Fecha de registro: 15 Feb 2026"
+- [x] 7.3 Mostrar fecha de registro
+  - [x] 7.3.1 Obtener `createdAt` de DynamoDB
+  - [x] 7.3.2 Formatear con date-fns
+  - [x] 7.3.3 Mostrar "Fecha de registro: 15 Feb 2026"
 
-- [ ] 7.4 Mostrar último inicio de sesión
-  - [ ] 7.4.1 Guardar `lastLoginAt` en DynamoDB
-  - [ ] 7.4.2 Actualizar en cada login
-  - [ ] 7.4.3 Formatear como relativo "Hace 5 minutos"
+- [x] 7.4 Mostrar último inicio de sesión
+  - [x] 7.4.1 Guardar `lastLoginAt` en DynamoDB
+  - [x] 7.4.2 Actualizar en cada login
+  - [x] 7.4.3 Formatear como relativo "Hace 5 minutos"
 
-- [ ] 7.5 Mostrar ID de usuario
-  - [ ] 7.5.1 Obtener `sub` de Cognito
-  - [ ] 7.5.2 Ocultar por defecto (••••••••)
-  - [ ] 7.5.3 Botón "Mostrar" para revelar
-  - [ ] 7.5.4 Botón "Copiar" para copiar al clipboard
+- [x] 7.5 Mostrar ID de usuario
+  - [x] 7.5.1 Obtener `sub` de Cognito
+  - [x] 7.5.2 Ocultar por defecto (••••••••)
+  - [x] 7.5.3 Botón "Mostrar" para revelar
+  - [x] 7.5.4 Botón "Copiar" para copiar al clipboard
 
-- [ ] 7.6 Testing de información de cuenta
-  - [ ] 7.6.1 Test: Email verificado muestra correctamente
-  - [ ] 7.6.2 Test: Fechas se formatean correctamente
-  - [ ] 7.6.3 Test: ID se oculta/muestra correctamente
-  - [ ] 7.6.4 Test: Copiar al clipboard funciona
+- [x] 7.6 Testing de información de cuenta
+  - [x] 7.6.1 Test: Email verificado muestra correctamente
+  - [x] 7.6.2 Test: Fechas se formatean correctamente
+  - [x] 7.6.3 Test: ID se oculta/muestra correctamente
+  - [x] 7.6.4 Test: Copiar al clipboard funciona
 
 ### 8. Preferencias de Usuario
 

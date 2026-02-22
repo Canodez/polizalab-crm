@@ -253,6 +253,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
         isLoading: false,
         error: null,
       });
+
+      // Trigger profile fetch to update lastLoginAt in DynamoDB
+      // This is done asynchronously and doesn't block the login flow
+      if (typeof window !== 'undefined') {
+        // Import profileApi dynamically to avoid circular dependencies
+        import('./api-client').then(({ profileApi }) => {
+          profileApi.getProfile().catch(error => {
+            console.error('Failed to update lastLoginAt on login:', error);
+          });
+        });
+      }
     } catch (error) {
       const errorType = classifyError(error);
       let errorMessage = 'Login failed';

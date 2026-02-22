@@ -121,6 +121,7 @@ export const profileApi = {
       profileImage: string | null;
       profileImageUrl: string | null;
       createdAt: string;
+      lastLoginAt?: string;
     }>('/profile');
   },
 
@@ -141,10 +142,10 @@ export const profileApi = {
   /**
    * Get pre-signed URL for profile image upload
    */
-  async getImageUploadUrl(fileName: string, fileType: string) {
-    return apiRequest<{ presignedUrl: string; s3Key: string }>('/profile/image', {
+  async getImageUploadUrl(fileName: string, contentType: string) {
+    return apiRequest<{ presignedUrl: string; s3Key: string; expiresIn: number }>('/profile/image', {
       method: 'POST',
-      body: JSON.stringify({ fileName, fileType }),
+      body: JSON.stringify({ fileName, contentType }),
     });
   },
 };

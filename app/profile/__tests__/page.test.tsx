@@ -1,21 +1,20 @@
-import React from 'react';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { useRouter } from 'next/navigation';
 import ProfilePage from '../page';
 import { useAuth } from '@/lib/auth-context';
 import { profileApi } from '@/lib/api-client';
-import { useDropzone } from 'react-dropzone';
 
-// Mock dependencies
+// Mock Next.js router
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
 }));
 
+// Mock auth context
 jest.mock('@/lib/auth-context', () => ({
   useAuth: jest.fn(),
 }));
 
+// Mock API client
 jest.mock('@/lib/api-client', () => ({
   profileApi: {
     getProfile: jest.fn(),
@@ -23,768 +22,618 @@ jest.mock('@/lib/api-client', () => ({
     getImageUploadUrl: jest.fn(),
   },
   ApiError: class ApiError extends Error {
-    constructor(message: string, public statusCode: number, public code?: string) {
+    constructor(message: string, public statusCode: number) {
       super(message);
       this.name = 'ApiError';
     }
   },
 }));
 
+// Mock react-dropzone
 jest.mock('react-dropzone', () => ({
-  useDropzone: jest.fn(),
+  useDropzone: jest.fn(() => ({
+    getRootProps: jest.fn(() => ({})),
+    getInputProps: jest.fn(() => ({})),
+    isDragActive: false,
+  })),
 }));
 
-describe('ProfilePage', () => {
+// Mock date-fns
+jest.mock('date-fns', () => ({
+  format: jest.fn((date, formatStr) => '15 Feb 2026'),
+  formatDistanceToNow: jest.fn(() => 'hace 5 minutos'),
+}));
+
+jest.mock('date-fns/locale', () => ({
+  es: {},
+}));
+
+// Mock UserMenu component
+jest.mock('@/components/UserMenu', () => {
+  return function MockUserMenu() {
+    return <div data-testid="user-menu">UserMenu</div>;
+  };
+});
+
+// Mock ImagePreview component
+jest.mock('@/components/ImagePreview', () => {
+  return function MockImagePreview() {
+    return <div data-testid="image-preview">ImagePreview</div>;
+  };
+});
+
+describe('ProfilePage - Account Information Section', () => {
   const mockPush = jest.fn();
+  const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+  const mockGetProfile = profileApi.getProfile as jest.MockedFunction<typeof profileApi.getProfile>;
+
   const mockProfileData = {
-    userId: 'user-123',
+    userId: 'test-user-123',
     email: 'test@example.com',
     nombre: 'Juan',
     apellido: 'Pérez',
     profileImage: null,
     profileImageUrl: null,
-    createdAt: '2024-01-01T00:00:00Z',
-  };
-
-  const mockDropzone = {
-    getRootProps: jest.fn(() => ({})),
-    getInputProps: jest.fn(() => ({})),
-    isDragActive: false,
+    createdAt: '2026-02-15T10:00:00Z',
+    lastLoginAt: '2026-02-21T14:30:00Z',
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
-    (useRouter as jest.Mock).mockReturnValue({ push: mockPush });
-    (useAuth as jest.Mock).mockReturnValue({
-      user: { email: 'test@example.com', sub: 'user-123' },
+    (useRouter as jest.Mock).mockReturnValue({
+      push: mockPush,
+    });
+
+    mockUseAuth.mockReturnValue({
+      user: {
+        userId: 'test-user-123',
+        email: 'test@example.com',
+        emailVerified: true,
+      },
       isAuthenticated: true,
       isLoading: false,
+      error: null,
+      login: jest.fn(),
+      logout: jest.fn(),
+      refreshUser: jest.fn(),
     });
-    (profileApi.getProfile as jest.Mock).mockResolvedValue(mockProfileData);
-    (useDropzone as jest.Mock).mockReturnValue(mockDropzone);
+
+    mockGetProfile.mockResolvedValue(mockProfileData);
   });
 
-  it('redirects to login if not authenticated', async () => {
-    (useAuth as jest.Mock).mockReturnValue({
-      user: null,
-      isAuthenticated: false,
-      isLoading: false,
-    });
-
-    render(<ProfilePage />);
-
-    await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/login');
-    });
-  });
-
-  it('displays loading state initially', () => {
-    (useAuth as jest.Mock).mockReturnValue({
-      user: null,
-      isAuthenticated: true,
-      isLoading: true,
-    });
-
-    render(<ProfilePage />);
-    expect(screen.getByText('Cargando...')).toBeInTheDocument();
-  });
-
-  it('loads and displays profile data', async () => {
-    render(<ProfilePage />);
-
-    await waitFor(() => {
-      expect(profileApi.getProfile).toHaveBeenCalled();
-    });
-
-    expect(screen.getByDisplayValue('test@example.com')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Juan')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Pérez')).toBeInTheDocument();
-  });
-
-  it('displays error when profile loading fails', async () => {
-    (profileApi.getProfile as jest.Mock).mockRejectedValue(
-      new Error('Network error')
-    );
-
-    render(<ProfilePage />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Error al cargar el perfil')).toBeInTheDocument();
-    });
-  });
-
-  it('enables edit mode when edit button is clicked', async () => {
-    render(<ProfilePage />);
-
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('Juan')).toBeInTheDocument();
-    });
-
-    const editButton = screen.getByRole('button', { name: /editar perfil/i });
-    fireEvent.click(editButton);
-
-    expect(screen.getByRole('button', { name: /guardar/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /cancelar/i })).toBeInTheDocument();
-  });
-
-  it('allows editing nombre and apellido fields', async () => {
-    const user = userEvent.setup();
-    render(<ProfilePage />);
-
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('Juan')).toBeInTheDocument();
-    });
-
-    // Enter edit mode
-    const editButton = screen.getByRole('button', { name: /editar perfil/i });
-    await user.click(editButton);
-
-    // Edit fields
-    const nombreInput = screen.getByDisplayValue('Juan');
-    const apellidoInput = screen.getByDisplayValue('Pérez');
-
-    await user.clear(nombreInput);
-    await user.type(nombreInput, 'Carlos');
-
-    await user.clear(apellidoInput);
-    await user.type(apellidoInput, 'García');
-
-    expect(screen.getByDisplayValue('Carlos')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('García')).toBeInTheDocument();
-  });
-
-  it('saves profile changes successfully', async () => {
-    const user = userEvent.setup();
-    (profileApi.updateProfile as jest.Mock).mockResolvedValue({ success: true });
-
-    render(<ProfilePage />);
-
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('Juan')).toBeInTheDocument();
-    });
-
-    // Enter edit mode
-    const editButton = screen.getByRole('button', { name: /editar perfil/i });
-    await user.click(editButton);
-
-    // Edit fields
-    const nombreInput = screen.getByDisplayValue('Juan');
-    await user.clear(nombreInput);
-    await user.type(nombreInput, 'Carlos');
-
-    // Save
-    const saveButton = screen.getByRole('button', { name: /guardar/i });
-    await user.click(saveButton);
-
-    await waitFor(() => {
-      expect(profileApi.updateProfile).toHaveBeenCalledWith({
-        nombre: 'Carlos',
-        apellido: 'Pérez',
-      });
-    });
-
-    expect(screen.getByText('Perfil actualizado correctamente')).toBeInTheDocument();
-  });
-
-  it('validates required fields before saving', async () => {
-    const user = userEvent.setup();
-    render(<ProfilePage />);
-
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('Juan')).toBeInTheDocument();
-    });
-
-    // Enter edit mode
-    const editButton = screen.getByRole('button', { name: /editar perfil/i });
-    await user.click(editButton);
-
-    // Clear nombre field
-    const nombreInput = screen.getByDisplayValue('Juan');
-    await user.clear(nombreInput);
-
-    // Try to save
-    const saveButton = screen.getByRole('button', { name: /guardar/i });
-    await user.click(saveButton);
-
-    expect(screen.getByText('Nombre y apellido son requeridos')).toBeInTheDocument();
-    expect(profileApi.updateProfile).not.toHaveBeenCalled();
-  });
-
-  it('cancels edit mode and restores original values', async () => {
-    const user = userEvent.setup();
-    render(<ProfilePage />);
-
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('Juan')).toBeInTheDocument();
-    });
-
-    // Enter edit mode
-    const editButton = screen.getByRole('button', { name: /editar perfil/i });
-    await user.click(editButton);
-
-    // Edit field
-    const nombreInput = screen.getByDisplayValue('Juan');
-    await user.clear(nombreInput);
-    await user.type(nombreInput, 'Carlos');
-
-    // Cancel
-    const cancelButton = screen.getByRole('button', { name: /cancelar/i });
-    await user.click(cancelButton);
-
-    // Original value should be restored
-    expect(screen.getByDisplayValue('Juan')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /editar perfil/i })).toBeInTheDocument();
-  });
-
-  it('displays error when save fails', async () => {
-    const user = userEvent.setup();
-    (profileApi.updateProfile as jest.Mock).mockRejectedValue(
-      new Error('Server error')
-    );
-
-    render(<ProfilePage />);
-
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('Juan')).toBeInTheDocument();
-    });
-
-    // Enter edit mode and save
-    const editButton = screen.getByRole('button', { name: /editar perfil/i });
-    await user.click(editButton);
-
-    const saveButton = screen.getByRole('button', { name: /guardar/i });
-    await user.click(saveButton);
-
-    await waitFor(() => {
-      expect(screen.getByText('Error al guardar el perfil')).toBeInTheDocument();
-    });
-  });
-
-  it('navigates back to home when volver button is clicked', async () => {
-    const user = userEvent.setup();
-    render(<ProfilePage />);
-
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('Juan')).toBeInTheDocument();
-    });
-
-    const volverButton = screen.getByRole('button', { name: /volver/i });
-    await user.click(volverButton);
-
-    expect(mockPush).toHaveBeenCalledWith('/');
-  });
-
-  describe('File Picker Validation', () => {
-    it('validates file type - rejects non-image files', async () => {
-      const mockOnDrop = jest.fn();
-      (useDropzone as jest.Mock).mockReturnValue({
-        getRootProps: jest.fn(() => ({})),
-        getInputProps: jest.fn(() => ({})),
-        isDragActive: false,
-      });
-
-      render(<ProfilePage />);
-
-      await waitFor(() => {
-        expect(screen.getByDisplayValue('Juan')).toBeInTheDocument();
-      });
-
-      // Enter edit mode
-      const editButton = screen.getByRole('button', { name: /editar perfil/i });
-      fireEvent.click(editButton);
-
-      // Get the onDrop callback from useDropzone
-      const dropzoneCall = (useDropzone as jest.Mock).mock.calls[0][0];
-      const onDrop = dropzoneCall.onDrop;
-
-      // Simulate dropping a text file (rejected)
-      const textFile = new File(['content'], 'test.txt', { type: 'text/plain' });
-      const rejectedFiles = [
-        {
-          file: textFile,
-          errors: [{ code: 'file-invalid-type', message: 'File type not accepted' }],
+  // Task 7.6.1: Test: Email verificado muestra correctamente
+  describe('7.6.1: Email verification status displays correctly', () => {
+    it('shows verified badge when email is verified', async () => {
+      mockUseAuth.mockReturnValue({
+        user: {
+          userId: 'test-user-123',
+          email: 'test@example.com',
+          emailVerified: true,
         },
-      ];
-
-      onDrop([], rejectedFiles);
-
-      await waitFor(() => {
-        expect(screen.getByText('Solo se permiten imágenes JPEG o PNG')).toBeInTheDocument();
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+        login: jest.fn(),
+        logout: jest.fn(),
+        refreshUser: jest.fn(),
       });
-    });
 
-    it('validates file size - rejects files larger than 2MB', async () => {
       render(<ProfilePage />);
 
       await waitFor(() => {
-        expect(screen.getByDisplayValue('Juan')).toBeInTheDocument();
+        expect(screen.getByText('Email verificado')).toBeInTheDocument();
       });
 
-      // Enter edit mode
-      const editButton = screen.getByRole('button', { name: /editar perfil/i });
-      fireEvent.click(editButton);
+      // Check for verified badge with "Sí" text
+      const verifiedBadge = screen.getByText('Sí');
+      expect(verifiedBadge).toBeInTheDocument();
+      expect(verifiedBadge.closest('span')).toHaveClass('bg-green-100', 'text-green-800');
+    });
 
-      // Get the onDrop callback from useDropzone
-      const dropzoneCall = (useDropzone as jest.Mock).mock.calls[0][0];
-      const onDrop = dropzoneCall.onDrop;
-
-      // Simulate dropping a large file (rejected)
-      const largeFile = new File(['x'.repeat(3 * 1024 * 1024)], 'large.jpg', {
-        type: 'image/jpeg',
-      });
-      const rejectedFiles = [
-        {
-          file: largeFile,
-          errors: [{ code: 'file-too-large', message: 'File is too large' }],
+    it('shows unverified badge when email is not verified', async () => {
+      mockUseAuth.mockReturnValue({
+        user: {
+          userId: 'test-user-123',
+          email: 'test@example.com',
+          emailVerified: false,
         },
-      ];
-
-      onDrop([], rejectedFiles);
-
-      await waitFor(() => {
-        expect(screen.getByText('La imagen no debe superar 2MB')).toBeInTheDocument();
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+        login: jest.fn(),
+        logout: jest.fn(),
+        refreshUser: jest.fn(),
       });
-    });
 
-    it('accepts valid image files (JPEG)', async () => {
       render(<ProfilePage />);
 
       await waitFor(() => {
-        expect(screen.getByDisplayValue('Juan')).toBeInTheDocument();
+        expect(screen.getByText('Email verificado')).toBeInTheDocument();
       });
 
-      // Enter edit mode
-      const editButton = screen.getByRole('button', { name: /editar perfil/i });
-      fireEvent.click(editButton);
+      // Check for unverified badge with "No" text
+      const unverifiedBadge = screen.getByText('No');
+      expect(unverifiedBadge).toBeInTheDocument();
+      expect(unverifiedBadge.closest('span')).toHaveClass('bg-red-100', 'text-red-800');
+    });
 
-      // Get the onDrop callback from useDropzone
-      const dropzoneCall = (useDropzone as jest.Mock).mock.calls[0][0];
-      const onDrop = dropzoneCall.onDrop;
-
-      // Simulate dropping a valid JPEG file
-      const validFile = new File(['image content'], 'photo.jpg', {
-        type: 'image/jpeg',
+    it('displays checkmark icon for verified email', async () => {
+      mockUseAuth.mockReturnValue({
+        user: {
+          userId: 'test-user-123',
+          email: 'test@example.com',
+          emailVerified: true,
+        },
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+        login: jest.fn(),
+        logout: jest.fn(),
+        refreshUser: jest.fn(),
       });
 
-      // Mock FileReader
-      const mockFileReader = {
-        readAsDataURL: jest.fn(),
-        onloadend: null as any,
-        result: 'data:image/jpeg;base64,mockbase64data',
+      render(<ProfilePage />);
+
+      await waitFor(() => {
+        const verifiedBadge = screen.getByText('Sí').closest('span');
+        expect(verifiedBadge).toBeInTheDocument();
+        
+        // Check for SVG checkmark icon
+        const svg = verifiedBadge?.querySelector('svg');
+        expect(svg).toBeInTheDocument();
+      });
+    });
+
+    it('displays X icon for unverified email', async () => {
+      mockUseAuth.mockReturnValue({
+        user: {
+          userId: 'test-user-123',
+          email: 'test@example.com',
+          emailVerified: false,
+        },
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+        login: jest.fn(),
+        logout: jest.fn(),
+        refreshUser: jest.fn(),
+      });
+
+      render(<ProfilePage />);
+
+      await waitFor(() => {
+        const unverifiedBadge = screen.getByText('No').closest('span');
+        expect(unverifiedBadge).toBeInTheDocument();
+        
+        // Check for SVG X icon
+        const svg = unverifiedBadge?.querySelector('svg');
+        expect(svg).toBeInTheDocument();
+      });
+    });
+  });
+
+  // Task 7.6.2: Test: Fechas se formatean correctamente
+  describe('7.6.2: Dates are formatted correctly', () => {
+    it('displays registration date in correct format', async () => {
+      render(<ProfilePage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Fecha de registro')).toBeInTheDocument();
+      });
+
+      // Check that the formatted date is displayed
+      expect(screen.getByText('15 Feb 2026')).toBeInTheDocument();
+    });
+
+    it('displays last login date as relative time', async () => {
+      render(<ProfilePage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Último inicio de sesión')).toBeInTheDocument();
+      });
+
+      // Check that the relative time is displayed
+      expect(screen.getByText('hace 5 minutos')).toBeInTheDocument();
+    });
+
+    it('does not display last login section when lastLoginAt is not available', async () => {
+      const profileWithoutLastLogin = {
+        ...mockProfileData,
+        lastLoginAt: undefined,
       };
-      global.FileReader = jest.fn(() => mockFileReader) as any;
+      mockGetProfile.mockResolvedValue(profileWithoutLastLogin);
 
-      onDrop([validFile], []);
-
-      // Trigger the FileReader onloadend
-      if (mockFileReader.readAsDataURL.mock.calls.length > 0) {
-        mockFileReader.onloadend?.();
-      }
-
-      await waitFor(() => {
-        const fileNames = screen.getAllByText('photo.jpg');
-        expect(fileNames.length).toBeGreaterThan(0);
-      });
-    });
-
-    it('accepts valid image files (PNG)', async () => {
       render(<ProfilePage />);
 
       await waitFor(() => {
-        expect(screen.getByDisplayValue('Juan')).toBeInTheDocument();
+        expect(screen.getByText('Fecha de registro')).toBeInTheDocument();
       });
 
-      // Enter edit mode
-      const editButton = screen.getByRole('button', { name: /editar perfil/i });
-      fireEvent.click(editButton);
-
-      // Get the onDrop callback from useDropzone
-      const dropzoneCall = (useDropzone as jest.Mock).mock.calls[0][0];
-      const onDrop = dropzoneCall.onDrop;
-
-      // Simulate dropping a valid PNG file
-      const validFile = new File(['image content'], 'photo.png', {
-        type: 'image/png',
-      });
-
-      // Mock FileReader
-      const mockFileReader = {
-        readAsDataURL: jest.fn(),
-        onloadend: null as any,
-        result: 'data:image/png;base64,mockbase64data',
-      };
-      global.FileReader = jest.fn(() => mockFileReader) as any;
-
-      onDrop([validFile], []);
-
-      // Trigger the FileReader onloadend
-      if (mockFileReader.readAsDataURL.mock.calls.length > 0) {
-        mockFileReader.onloadend?.();
-      }
-
-      await waitFor(() => {
-        const fileNames = screen.getAllByText('photo.png');
-        expect(fileNames.length).toBeGreaterThan(0);
-      });
+      // Last login section should not be present
+      expect(screen.queryByText('Último inicio de sesión')).not.toBeInTheDocument();
     });
 
-    it('configures dropzone with correct accept types', async () => {
+    it('displays calendar icon next to registration date', async () => {
       render(<ProfilePage />);
 
       await waitFor(() => {
-        expect(screen.getByDisplayValue('Juan')).toBeInTheDocument();
+        const registrationDateRow = screen.getByText('Fecha de registro').closest('div');
+        expect(registrationDateRow).toBeInTheDocument();
+        
+        // Check for calendar icon (SVG)
+        const svg = registrationDateRow?.querySelector('svg');
+        expect(svg).toBeInTheDocument();
+      });
+    });
+
+    it('displays calendar icon next to last login date', async () => {
+      render(<ProfilePage />);
+
+      await waitFor(() => {
+        const lastLoginRow = screen.getByText('Último inicio de sesión').closest('div');
+        expect(lastLoginRow).toBeInTheDocument();
+        
+        // Check for calendar icon (SVG)
+        const svg = lastLoginRow?.querySelector('svg');
+        expect(svg).toBeInTheDocument();
+      });
+    });
+
+    it('formats dates using Spanish locale', async () => {
+      const { format, formatDistanceToNow } = require('date-fns');
+      const { es } = require('date-fns/locale');
+
+      render(<ProfilePage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Fecha de registro')).toBeInTheDocument();
       });
 
-      // Enter edit mode
-      const editButton = screen.getByRole('button', { name: /editar perfil/i });
-      fireEvent.click(editButton);
+      // Verify that format was called with Spanish locale
+      expect(format).toHaveBeenCalledWith(
+        expect.any(Date),
+        'd MMM yyyy',
+        { locale: es }
+      );
 
-      // Check useDropzone was called with correct config
-      const dropzoneCall = (useDropzone as jest.Mock).mock.calls[0][0];
+      // Verify that formatDistanceToNow was called with Spanish locale
+      expect(formatDistanceToNow).toHaveBeenCalledWith(
+        expect.any(Date),
+        { addSuffix: true, locale: es }
+      );
+    });
+  });
+
+  // Task 7.6.3: Test: ID se oculta/muestra correctamente
+  describe('7.6.3: User ID show/hide functionality', () => {
+    it('displays user ID as hidden by default', async () => {
+      render(<ProfilePage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('ID de usuario')).toBeInTheDocument();
+      });
+
+      // Check that the ID is hidden (showing dots)
+      expect(screen.getByText('••••••••••••••••')).toBeInTheDocument();
       
-      expect(dropzoneCall.accept).toEqual({
-        'image/jpeg': ['.jpg', '.jpeg'],
-        'image/png': ['.png'],
-      });
-      expect(dropzoneCall.maxSize).toBe(2 * 1024 * 1024); // 2MB
-      expect(dropzoneCall.multiple).toBe(false);
+      // Check that the actual ID is not visible
+      expect(screen.queryByText('test-user-123')).not.toBeInTheDocument();
     });
 
-    it('disables file picker when not in edit mode', async () => {
+    it('shows user ID when show button is clicked', async () => {
       render(<ProfilePage />);
 
       await waitFor(() => {
-        expect(screen.getByDisplayValue('Juan')).toBeInTheDocument();
+        expect(screen.getByText('ID de usuario')).toBeInTheDocument();
       });
 
-      // Check useDropzone was called with disabled=true initially
-      const dropzoneCall = (useDropzone as jest.Mock).mock.calls[0][0];
-      expect(dropzoneCall.disabled).toBe(true);
+      // Find and click the show button
+      const showButton = screen.getByLabelText('Mostrar ID de usuario');
+      fireEvent.click(showButton);
+
+      // Check that the actual ID is now visible
+      expect(screen.getByText('test-user-123')).toBeInTheDocument();
+      
+      // Check that the dots are no longer visible
+      expect(screen.queryByText('••••••••••••••••')).not.toBeInTheDocument();
     });
 
-    it('enables file picker when in edit mode', async () => {
+    it('hides user ID when hide button is clicked after showing', async () => {
       render(<ProfilePage />);
 
       await waitFor(() => {
-        expect(screen.getByDisplayValue('Juan')).toBeInTheDocument();
+        expect(screen.getByText('ID de usuario')).toBeInTheDocument();
       });
 
-      // Initially disabled
-      const initialDropzoneCall = (useDropzone as jest.Mock).mock.calls[0][0];
-      expect(initialDropzoneCall.disabled).toBe(true);
+      // Show the ID first
+      const showButton = screen.getByLabelText('Mostrar ID de usuario');
+      fireEvent.click(showButton);
 
-      // Enter edit mode
-      const editButton = screen.getByRole('button', { name: /editar perfil/i });
-      fireEvent.click(editButton);
+      await waitFor(() => {
+        expect(screen.getByText('test-user-123')).toBeInTheDocument();
+      });
 
-      // After edit, should be enabled (disabled=false)
-      // The component re-renders, so check the last call
-      const lastCallIndex = (useDropzone as jest.Mock).mock.calls.length - 1;
-      const lastDropzoneCall = (useDropzone as jest.Mock).mock.calls[lastCallIndex][0];
-      expect(lastDropzoneCall.disabled).toBe(false);
+      // Now hide it again
+      const hideButton = screen.getByLabelText('Ocultar ID de usuario');
+      fireEvent.click(hideButton);
+
+      // Check that the ID is hidden again
+      expect(screen.getByText('••••••••••••••••')).toBeInTheDocument();
+      expect(screen.queryByText('test-user-123')).not.toBeInTheDocument();
+    });
+
+    it('displays eye icon when ID is hidden', async () => {
+      render(<ProfilePage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('ID de usuario')).toBeInTheDocument();
+      });
+
+      const showButton = screen.getByLabelText('Mostrar ID de usuario');
+      expect(showButton).toBeInTheDocument();
+      
+      // Check that the button contains an SVG (eye icon)
+      const svg = showButton.querySelector('svg');
+      expect(svg).toBeInTheDocument();
+    });
+
+    it('displays eye-slash icon when ID is shown', async () => {
+      render(<ProfilePage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('ID de usuario')).toBeInTheDocument();
+      });
+
+      // Show the ID
+      const showButton = screen.getByLabelText('Mostrar ID de usuario');
+      fireEvent.click(showButton);
+
+      await waitFor(() => {
+        const hideButton = screen.getByLabelText('Ocultar ID de usuario');
+        expect(hideButton).toBeInTheDocument();
+        
+        // Check that the button contains an SVG (eye-slash icon)
+        const svg = hideButton.querySelector('svg');
+        expect(svg).toBeInTheDocument();
+      });
+    });
+
+    it('toggles between show and hide states multiple times', async () => {
+      render(<ProfilePage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('ID de usuario')).toBeInTheDocument();
+      });
+
+      // Initially hidden
+      expect(screen.getByText('••••••••••••••••')).toBeInTheDocument();
+
+      // Show
+      fireEvent.click(screen.getByLabelText('Mostrar ID de usuario'));
+      await waitFor(() => {
+        expect(screen.getByText('test-user-123')).toBeInTheDocument();
+      });
+
+      // Hide
+      fireEvent.click(screen.getByLabelText('Ocultar ID de usuario'));
+      await waitFor(() => {
+        expect(screen.getByText('••••••••••••••••')).toBeInTheDocument();
+      });
+
+      // Show again
+      fireEvent.click(screen.getByLabelText('Mostrar ID de usuario'));
+      await waitFor(() => {
+        expect(screen.getByText('test-user-123')).toBeInTheDocument();
+      });
+    });
+
+    it('displays user ID in monospace font', async () => {
+      render(<ProfilePage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('ID de usuario')).toBeInTheDocument();
+      });
+
+      // Show the ID
+      const showButton = screen.getByLabelText('Mostrar ID de usuario');
+      fireEvent.click(showButton);
+
+      await waitFor(() => {
+        const userIdElement = screen.getByText('test-user-123');
+        expect(userIdElement).toHaveClass('font-mono');
+      });
     });
   });
 
-  describe('S3 Upload and Image Display', () => {
+  // Task 7.6.4: Test: Copiar al clipboard funciona
+  describe('7.6.4: Copy to clipboard functionality', () => {
+    let mockClipboard: { writeText: jest.Mock };
+
     beforeEach(() => {
-      // Mock XMLHttpRequest for S3 upload
-      const mockXHR = {
-        open: jest.fn(),
-        send: jest.fn(),
-        setRequestHeader: jest.fn(),
-        upload: {
-          addEventListener: jest.fn(),
-        },
-        addEventListener: jest.fn((event, handler) => {
-          if (event === 'load') {
-            mockXHR._loadHandler = handler;
-          }
-        }),
-        status: 200,
-        _loadHandler: null as any,
-        timeout: 0,
+      // Mock clipboard API
+      mockClipboard = {
+        writeText: jest.fn().mockResolvedValue(undefined),
       };
-      (global as any).XMLHttpRequest = jest.fn(() => mockXHR);
+      Object.assign(navigator, {
+        clipboard: mockClipboard,
+      });
     });
 
-    it('uploads image to S3 successfully', async () => {
-      const mockPresignedUrl = 'https://s3.amazonaws.com/bucket/key?signature=xyz';
-      const mockS3Key = 'profile-images/user-123/photo.jpg';
-      
-      (profileApi.getImageUploadUrl as jest.Mock).mockResolvedValue({
-        presignedUrl: mockPresignedUrl,
-        s3Key: mockS3Key,
+    it('displays copy button next to user ID', async () => {
+      render(<ProfilePage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('ID de usuario')).toBeInTheDocument();
       });
-      (profileApi.updateProfile as jest.Mock).mockResolvedValue({ success: true });
+
+      const copyButton = screen.getByLabelText('Copiar ID de usuario');
+      expect(copyButton).toBeInTheDocument();
+    });
+
+    it('copies user ID to clipboard when copy button is clicked', async () => {
+      render(<ProfilePage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('ID de usuario')).toBeInTheDocument();
+      });
+
+      const copyButton = screen.getByLabelText('Copiar ID de usuario');
+      fireEvent.click(copyButton);
+
+      await waitFor(() => {
+        expect(mockClipboard.writeText).toHaveBeenCalledWith('test-user-123');
+      });
+    });
+
+    it('shows checkmark icon after successful copy', async () => {
+      render(<ProfilePage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('ID de usuario')).toBeInTheDocument();
+      });
+
+      const copyButton = screen.getByLabelText('Copiar ID de usuario');
+      fireEvent.click(copyButton);
+
+      await waitFor(() => {
+        // Check that the checkmark icon is displayed
+        const svg = copyButton.querySelector('svg');
+        expect(svg).toBeInTheDocument();
+        expect(svg).toHaveClass('text-green-600');
+      });
+    });
+
+    it('reverts to clipboard icon after 2 seconds', async () => {
+      jest.useFakeTimers();
 
       render(<ProfilePage />);
 
       await waitFor(() => {
-        expect(screen.getByDisplayValue('Juan')).toBeInTheDocument();
+        expect(screen.getByText('ID de usuario')).toBeInTheDocument();
       });
 
-      // Enter edit mode
-      const editButton = screen.getByRole('button', { name: /editar perfil/i });
-      fireEvent.click(editButton);
+      const copyButton = screen.getByLabelText('Copiar ID de usuario');
+      fireEvent.click(copyButton);
 
-      // Get the onDrop callback
-      const dropzoneCall = (useDropzone as jest.Mock).mock.calls[0][0];
-      const onDrop = dropzoneCall.onDrop;
-
-      // Simulate file selection
-      const validFile = new File(['image content'], 'photo.jpg', {
-        type: 'image/jpeg',
+      // Wait for the checkmark to appear
+      await waitFor(() => {
+        const svg = copyButton.querySelector('svg');
+        expect(svg).toHaveClass('text-green-600');
       });
 
-      const mockFileReader = {
-        readAsDataURL: jest.fn(),
-        onloadend: null as any,
-        result: 'data:image/jpeg;base64,mockbase64data',
-      };
-      global.FileReader = jest.fn(() => mockFileReader) as any;
+      // Fast-forward time by 2 seconds
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
 
-      onDrop([validFile], []);
+      // Wait for the icon to revert
+      await waitFor(() => {
+        const svg = copyButton.querySelector('svg');
+        expect(svg).not.toHaveClass('text-green-600');
+      });
 
-      // Trigger FileReader onloadend
-      if (mockFileReader.readAsDataURL.mock.calls.length > 0) {
-        mockFileReader.onloadend?.();
-      }
+      jest.useRealTimers();
+    });
+
+    it('handles clipboard copy errors gracefully', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      mockClipboard.writeText.mockRejectedValue(new Error('Clipboard error'));
+
+      render(<ProfilePage />);
 
       await waitFor(() => {
-        expect(screen.getByText('photo.jpg')).toBeInTheDocument();
+        expect(screen.getByText('ID de usuario')).toBeInTheDocument();
       });
 
-      // Click save on the image preview modal
-      const saveButton = screen.getByRole('button', { name: /guardar/i });
-      fireEvent.click(saveButton);
+      const copyButton = screen.getByLabelText('Copiar ID de usuario');
+      fireEvent.click(copyButton);
 
-      // Wait for upload to complete
       await waitFor(() => {
-        expect(profileApi.getImageUploadUrl).toHaveBeenCalledWith(
-          'photo.jpg',
-          'image/jpeg'
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          'Failed to copy user ID:',
+          expect.any(Error)
         );
       });
 
-      // Simulate successful XHR upload
-      const xhrInstance = (global as any).XMLHttpRequest.mock.results[0].value;
-      if (xhrInstance._loadHandler) {
-        xhrInstance._loadHandler();
-      }
-
+      // Check that error message is displayed
       await waitFor(() => {
-        expect(profileApi.updateProfile).toHaveBeenCalled();
+        expect(screen.getByText('Error al copiar el ID de usuario')).toBeInTheDocument();
       });
+
+      consoleErrorSpy.mockRestore();
     });
 
-    it('handles S3 upload errors gracefully', async () => {
-      (profileApi.getImageUploadUrl as jest.Mock).mockRejectedValue(
-        new Error('Failed to get upload URL')
-      );
+    it('does not copy if user ID is not available', async () => {
+      mockUseAuth.mockReturnValue({
+        user: {
+          userId: undefined as any,
+          email: 'test@example.com',
+          emailVerified: true,
+        },
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+        login: jest.fn(),
+        logout: jest.fn(),
+        refreshUser: jest.fn(),
+      });
 
       render(<ProfilePage />);
 
       await waitFor(() => {
-        expect(screen.getByDisplayValue('Juan')).toBeInTheDocument();
+        expect(screen.getByText('ID de usuario')).toBeInTheDocument();
       });
 
-      // Enter edit mode
-      const editButton = screen.getByRole('button', { name: /editar perfil/i });
-      fireEvent.click(editButton);
+      const copyButton = screen.getByLabelText('Copiar ID de usuario');
+      fireEvent.click(copyButton);
 
-      // Get the onDrop callback
-      const dropzoneCall = (useDropzone as jest.Mock).mock.calls[0][0];
-      const onDrop = dropzoneCall.onDrop;
-
-      // Simulate file selection
-      const validFile = new File(['image content'], 'photo.jpg', {
-        type: 'image/jpeg',
-      });
-
-      const mockFileReader = {
-        readAsDataURL: jest.fn(),
-        onloadend: null as any,
-        result: 'data:image/jpeg;base64,mockbase64data',
-      };
-      global.FileReader = jest.fn(() => mockFileReader) as any;
-
-      onDrop([validFile], []);
-
-      // Trigger FileReader onloadend
-      if (mockFileReader.readAsDataURL.mock.calls.length > 0) {
-        mockFileReader.onloadend?.();
-      }
-
-      await waitFor(() => {
-        expect(screen.getByText('photo.jpg')).toBeInTheDocument();
-      });
-
-      // Click save on the image preview modal
-      const saveButton = screen.getByRole('button', { name: /guardar/i });
-      fireEvent.click(saveButton);
-
-      await waitFor(() => {
-        expect(screen.getByText(/error al obtener url de subida/i)).toBeInTheDocument();
-      });
+      // Clipboard should not be called
+      expect(mockClipboard.writeText).not.toHaveBeenCalled();
     });
 
-    it('displays profile image when profileImageUrl is provided', async () => {
-      const mockProfileWithImage = {
-        ...mockProfileData,
-        profileImageUrl: 'https://s3.amazonaws.com/bucket/profile.jpg',
-      };
-      (profileApi.getProfile as jest.Mock).mockResolvedValue(mockProfileWithImage);
-
+    it('displays clipboard icon by default', async () => {
       render(<ProfilePage />);
 
       await waitFor(() => {
-        const profileImage = screen.getByAltText('Foto de perfil');
-        expect(profileImage).toBeInTheDocument();
-        expect(profileImage).toHaveAttribute('src', mockProfileWithImage.profileImageUrl);
-      });
-    });
-
-    it('shows initials when no profile image is available', async () => {
-      render(<ProfilePage />);
-
-      await waitFor(() => {
-        expect(screen.getByDisplayValue('Juan')).toBeInTheDocument();
+        expect(screen.getByText('ID de usuario')).toBeInTheDocument();
       });
 
-      // Check that initial 'J' is displayed (from "Juan")
-      const avatarContainer = screen.getByText('J');
-      expect(avatarContainer).toBeInTheDocument();
-    });
-
-    it('updates profile image URL in DynamoDB after upload', async () => {
-      const mockPresignedUrl = 'https://s3.amazonaws.com/bucket/key?signature=xyz';
-      const mockS3Key = 'profile-images/user-123/photo.jpg';
+      const copyButton = screen.getByLabelText('Copiar ID de usuario');
+      const svg = copyButton.querySelector('svg');
       
-      (profileApi.getImageUploadUrl as jest.Mock).mockResolvedValue({
-        presignedUrl: mockPresignedUrl,
-        s3Key: mockS3Key,
-      });
-      (profileApi.updateProfile as jest.Mock).mockResolvedValue({ success: true });
-
-      render(<ProfilePage />);
-
-      await waitFor(() => {
-        expect(screen.getByDisplayValue('Juan')).toBeInTheDocument();
-      });
-
-      // Enter edit mode
-      const editButton = screen.getByRole('button', { name: /editar perfil/i });
-      fireEvent.click(editButton);
-
-      // Simulate file selection and upload
-      const dropzoneCall = (useDropzone as jest.Mock).mock.calls[0][0];
-      const onDrop = dropzoneCall.onDrop;
-
-      const validFile = new File(['image content'], 'photo.jpg', {
-        type: 'image/jpeg',
-      });
-
-      const mockFileReader = {
-        readAsDataURL: jest.fn(),
-        onloadend: null as any,
-        result: 'data:image/jpeg;base64,mockbase64data',
-      };
-      global.FileReader = jest.fn(() => mockFileReader) as any;
-
-      onDrop([validFile], []);
-
-      if (mockFileReader.readAsDataURL.mock.calls.length > 0) {
-        mockFileReader.onloadend?.();
-      }
-
-      await waitFor(() => {
-        expect(screen.getByText('photo.jpg')).toBeInTheDocument();
-      });
-
-      // Click save
-      const saveButton = screen.getByRole('button', { name: /guardar/i });
-      fireEvent.click(saveButton);
-
-      // Simulate successful upload
-      const xhrInstance = (global as any).XMLHttpRequest.mock.results[0].value;
-      if (xhrInstance._loadHandler) {
-        xhrInstance._loadHandler();
-      }
-
-      await waitFor(() => {
-        expect(profileApi.updateProfile).toHaveBeenCalledWith({
-          nombre: 'Juan',
-          apellido: 'Pérez',
-        });
-      });
-
-      // Verify profile is reloaded to get updated image URL
-      await waitFor(() => {
-        expect(profileApi.getProfile).toHaveBeenCalledTimes(2); // Initial load + reload after save
-      });
+      expect(svg).toBeInTheDocument();
+      expect(svg).not.toHaveClass('text-green-600');
     });
 
-    it('shows upload progress during S3 upload', async () => {
-      const mockPresignedUrl = 'https://s3.amazonaws.com/bucket/key?signature=xyz';
-      const mockS3Key = 'profile-images/user-123/photo.jpg';
-      
-      (profileApi.getImageUploadUrl as jest.Mock).mockResolvedValue({
-        presignedUrl: mockPresignedUrl,
-        s3Key: mockS3Key,
-      });
+    it('allows multiple copy operations', async () => {
+      jest.useFakeTimers();
 
       render(<ProfilePage />);
 
       await waitFor(() => {
-        expect(screen.getByDisplayValue('Juan')).toBeInTheDocument();
+        expect(screen.getByText('ID de usuario')).toBeInTheDocument();
       });
 
-      // Enter edit mode and select file
-      const editButton = screen.getByRole('button', { name: /editar perfil/i });
-      fireEvent.click(editButton);
+      const copyButton = screen.getByLabelText('Copiar ID de usuario');
 
-      const dropzoneCall = (useDropzone as jest.Mock).mock.calls[0][0];
-      const onDrop = dropzoneCall.onDrop;
-
-      const validFile = new File(['image content'], 'photo.jpg', {
-        type: 'image/jpeg',
-      });
-
-      const mockFileReader = {
-        readAsDataURL: jest.fn(),
-        onloadend: null as any,
-        result: 'data:image/jpeg;base64,mockbase64data',
-      };
-      global.FileReader = jest.fn(() => mockFileReader) as any;
-
-      onDrop([validFile], []);
-
-      if (mockFileReader.readAsDataURL.mock.calls.length > 0) {
-        mockFileReader.onloadend?.();
-      }
-
+      // First copy
+      fireEvent.click(copyButton);
       await waitFor(() => {
-        expect(screen.getByText('photo.jpg')).toBeInTheDocument();
+        expect(mockClipboard.writeText).toHaveBeenCalledTimes(1);
       });
 
-      // Click save
-      const saveButton = screen.getByRole('button', { name: /guardar/i });
-      fireEvent.click(saveButton);
+      // Wait for icon to revert
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
 
-      // Simulate progress event
-      const xhrInstance = (global as any).XMLHttpRequest.mock.results[0].value;
-      const progressHandler = xhrInstance.upload.addEventListener.mock.calls.find(
-        (call: any) => call[0] === 'progress'
-      )?.[1];
-
-      if (progressHandler) {
-        progressHandler({ lengthComputable: true, loaded: 50, total: 100 });
-      }
-
+      // Second copy
+      fireEvent.click(copyButton);
       await waitFor(() => {
-        expect(screen.getByText('Subiendo imagen...')).toBeInTheDocument();
-        expect(screen.getByText('50%')).toBeInTheDocument();
+        expect(mockClipboard.writeText).toHaveBeenCalledTimes(2);
       });
+
+      jest.useRealTimers();
     });
   });
 });

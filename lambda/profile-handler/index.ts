@@ -104,6 +104,7 @@ function extractUserIdFromToken(event: APIGatewayProxyEvent): string | null {
 /**
  * Handle GET /profile
  * Retrieves user profile data from DynamoDB
+ * Also updates lastLoginAt timestamp on each access
  */
 async function handleGetProfile(userId: string): Promise<APIGatewayProxyResult> {
   try {
@@ -119,6 +120,22 @@ async function handleGetProfile(userId: string): Promise<APIGatewayProxyResult> 
     if (!result.Item) {
       return createErrorResponse(404, 'NOT_FOUND', 'User profile not found');
     }
+
+    // Update lastLoginAt timestamp asynchronously (don't wait for it)
+    const now = new Date().toISOString();
+    docClient.send(
+      new UpdateCommand({
+        TableName: USERS_TABLE,
+        Key: { userId },
+        UpdateExpression: 'SET lastLoginAt = :lastLoginAt',
+        ExpressionAttributeValues: {
+          ':lastLoginAt': now,
+        },
+      })
+    ).catch(error => {
+      // Log error but don't fail the request
+      console.error('Failed to update lastLoginAt', { userId, error });
+    });
 
     console.log('Profile retrieved successfully', { userId });
 
