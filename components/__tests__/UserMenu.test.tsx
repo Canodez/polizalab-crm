@@ -203,7 +203,7 @@ describe('UserMenu', () => {
 
       // Menu should close and navigation should occur
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/profile');
+        expect(mockPush).toHaveBeenCalledWith('/account/profile');
       });
     });
   });
@@ -225,7 +225,7 @@ describe('UserMenu', () => {
       const profileButton = screen.getByText('Mi perfil');
       fireEvent.click(profileButton);
 
-      expect(mockPush).toHaveBeenCalledWith('/profile');
+      expect(mockPush).toHaveBeenCalledWith('/account/profile');
     });
 
     it('navigates to security page when "Seguridad" is clicked', async () => {
@@ -243,7 +243,7 @@ describe('UserMenu', () => {
       const securityButton = screen.getByText('Seguridad');
       fireEvent.click(securityButton);
 
-      expect(mockPush).toHaveBeenCalledWith('/security');
+      expect(mockPush).toHaveBeenCalledWith('/account/security');
     });
 
     it('navigates to settings page when "Configuración" is clicked', async () => {
@@ -261,7 +261,7 @@ describe('UserMenu', () => {
       const settingsButton = screen.getByText('Configuración');
       fireEvent.click(settingsButton);
 
-      expect(mockPush).toHaveBeenCalledWith('/settings');
+      expect(mockPush).toHaveBeenCalledWith('/account/preferences');
     });
 
     it('displays correct icons for each menu item', async () => {
@@ -467,7 +467,7 @@ describe('UserMenu', () => {
       fireEvent.click(profileButton);
 
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/profile');
+        expect(mockPush).toHaveBeenCalledWith('/account/profile');
       });
     });
 

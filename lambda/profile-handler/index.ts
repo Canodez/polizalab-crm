@@ -23,7 +23,8 @@ interface UpdateProfileRequestBody {
 
 interface ProfileImageRequestBody {
   fileName: string;
-  fileType: string;
+  fileType?: string;      // legacy field name
+  contentType?: string;  // field name used by the frontend
 }
 
 /**
@@ -33,10 +34,14 @@ interface ProfileImageRequestBody {
 export const handler = async (
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> => {
-  console.log('Profile Handler invoked', { 
-    path: event.path, 
-    method: event.httpMethod,
-    headers: event.headers 
+  // Support both REST API v1 (event.path/httpMethod) and HTTP API v2 (event.rawPath/requestContext.http.method)
+  const path = event.path || (event as any).rawPath || '';
+  const method = event.httpMethod || (event as any).requestContext?.http?.method || '';
+
+  console.log('Profile Handler invoked', {
+    path,
+    method,
+    headers: event.headers
   });
 
   try {
@@ -47,15 +52,15 @@ export const handler = async (
     }
 
     // Route to appropriate handler
-    if (event.path === '/profile' && event.httpMethod === 'GET') {
-      return await handleGetProfile(userId);
+    if (path === '/profile' && method === 'GET') {
+      return await handleGetProfile(userId, event);
     }
 
-    if (event.path === '/profile' && event.httpMethod === 'PUT') {
+    if (path === '/profile' && method === 'PUT') {
       return await handleUpdateProfile(userId, event);
     }
 
-    if (event.path === '/profile/image' && event.httpMethod === 'POST') {
+    if (path === '/profile/image' && method === 'POST') {
       return await handleGetImageUploadUrl(userId, event);
     }
 
@@ -71,10 +76,12 @@ export const handler = async (
  */
 function extractUserIdFromToken(event: APIGatewayProxyEvent): string | null {
   try {
-    // In API Gateway with Cognito authorizer, the userId is available in requestContext
-    // The authorizer validates the token and adds claims to the context
-    const userId = event.requestContext?.authorizer?.claims?.sub;
-    
+    // REST API v1 (Cognito authorizer): requestContext.authorizer.claims.sub
+    // HTTP API v2 (JWT authorizer): requestContext.authorizer.jwt.claims.sub
+    const userId =
+      event.requestContext?.authorizer?.claims?.sub ||
+      (event.requestContext?.authorizer as any)?.jwt?.claims?.sub;
+
     if (userId) {
       return userId;
     }
@@ -109,7 +116,7 @@ function extractUserIdFromToken(event: APIGatewayProxyEvent): string | null {
  * Retrieves user profile data from DynamoDB
  * Also updates lastLoginAt timestamp on each access
  */
-async function handleGetProfile(userId: string): Promise<APIGatewayProxyResult> {
+async function handleGetProfile(userId: string, event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
   try {
     console.log('Getting profile', { userId });
 
@@ -124,15 +131,17 @@ async function handleGetProfile(userId: string): Promise<APIGatewayProxyResult> 
       return createErrorResponse(404, 'NOT_FOUND', 'User profile not found');
     }
 
-    // Update lastLoginAt timestamp asynchronously (don't wait for it)
+    // Update lastLoginAt and deviceInfo asynchronously (don't wait for it)
     const now = new Date().toISOString();
+    const userAgent = event.headers?.['User-Agent'] || event.headers?.['user-agent'] || '';
     docClient.send(
       new UpdateCommand({
         TableName: USERS_TABLE,
         Key: { userId },
-        UpdateExpression: 'SET lastLoginAt = :lastLoginAt',
+        UpdateExpression: 'SET lastLoginAt = :lastLoginAt, deviceInfo = :deviceInfo',
         ExpressionAttributeValues: {
           ':lastLoginAt': now,
+          ':deviceInfo': userAgent,
         },
       })
     ).catch(error => {
@@ -310,22 +319,25 @@ async function handleGetImageUploadUrl(
 
     const body: ProfileImageRequestBody = JSON.parse(event.body);
 
+    // Accept either contentType (frontend) or fileType (legacy)
+    const resolvedContentType = body.contentType || body.fileType;
+
     // Validate required fields
-    if (!body.fileName || !body.fileType) {
+    if (!body.fileName || !resolvedContentType) {
       return createErrorResponse(
         400,
         'VALIDATION_ERROR',
-        'fileName and fileType are required',
+        'fileName and contentType are required',
         {
           fileName: !body.fileName ? 'Required' : undefined,
-          fileType: !body.fileType ? 'Required' : undefined,
+          contentType: !resolvedContentType ? 'Required' : undefined,
         }
       );
     }
 
     // Validate file type (JPEG, PNG, WebP)
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(body.fileType.toLowerCase())) {
+    if (!allowedTypes.includes(resolvedContentType.toLowerCase())) {
       return createErrorResponse(
         400,
         'VALIDATION_ERROR',
@@ -339,13 +351,13 @@ async function handleGetImageUploadUrl(
     // Generate S3 key: profiles/{userId}/{fileName}
     const s3Key = `profiles/${userId}/${body.fileName}`;
 
-    console.log('Generating pre-signed URL', { userId, s3Key, fileType: body.fileType });
+    console.log('Generating pre-signed URL', { userId, s3Key, contentType: resolvedContentType });
 
     // Generate pre-signed URL for PUT operation
     const command = new PutObjectCommand({
       Bucket: S3_BUCKET,
       Key: s3Key,
-      ContentType: body.fileType,
+      ContentType: resolvedContentType,
     });
 
     const presignedUrl = await getSignedUrl(s3Client, command, {

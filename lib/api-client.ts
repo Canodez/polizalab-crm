@@ -122,6 +122,7 @@ export const profileApi = {
       profileImageUrl: string | null;
       createdAt: string;
       lastLoginAt?: string;
+      deviceInfo?: string;
       preferredLanguage?: string;
       timeZone?: string;
       emailNotificationsEnabled?: boolean;

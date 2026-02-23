@@ -122,7 +122,7 @@ describe('Navbar', () => {
         fireEvent.click(profileButton);
       });
 
-      expect(mockPush).toHaveBeenCalledWith('/profile');
+      expect(mockPush).toHaveBeenCalledWith('/account/profile');
     });
 
     it('should navigate to security when "Seguridad" is clicked', async () => {
@@ -136,7 +136,7 @@ describe('Navbar', () => {
         fireEvent.click(securityButton);
       });
 
-      expect(mockPush).toHaveBeenCalledWith('/security');
+      expect(mockPush).toHaveBeenCalledWith('/account/security');
     });
 
     it('should navigate to settings when "Configuración" is clicked', async () => {
@@ -150,7 +150,7 @@ describe('Navbar', () => {
         fireEvent.click(settingsButton);
       });
 
-      expect(mockPush).toHaveBeenCalledWith('/settings');
+      expect(mockPush).toHaveBeenCalledWith('/account/preferences');
     });
 
     it('should logout and redirect when "Cerrar sesión" is clicked', async () => {
