@@ -1,6 +1,6 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
@@ -151,10 +151,14 @@ async function handleGetProfile(userId: string, event: APIGatewayProxyEvent): Pr
 
     console.log('Profile retrieved successfully', { userId });
 
-    // Convert profileImage S3 key to full URL if it exists
+    // Convert profileImage S3 key to a presigned GET URL (24h expiry)
     const profileData = { ...result.Item };
     if (profileData.profileImage) {
-      profileData.profileImageUrl = `https://${S3_BUCKET}.s3.amazonaws.com/${profileData.profileImage}`;
+      profileData.profileImageUrl = await getSignedUrl(
+        s3Client,
+        new GetObjectCommand({ Bucket: S3_BUCKET, Key: profileData.profileImage }),
+        { expiresIn: 86400 }
+      );
     }
 
     return {

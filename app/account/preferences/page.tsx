@@ -13,6 +13,69 @@ interface SavedPreferences {
 
 const SUPPORTED_LANGUAGES = [{ value: 'es', label: 'Español' }];
 
+interface TzOption { value: string; label: string }
+interface TzGroup { group: string; options: TzOption[] }
+
+const TIMEZONE_GROUPS: TzGroup[] = [
+  {
+    group: 'Estados Unidos',
+    options: [
+      { value: 'America/New_York',    label: 'Este — Nueva York, Miami, Atlanta' },
+      { value: 'America/Chicago',     label: 'Central — Chicago, Dallas, Houston' },
+      { value: 'America/Denver',      label: 'Montaña — Denver, Salt Lake City' },
+      { value: 'America/Phoenix',     label: 'Montaña sin DST — Phoenix' },
+      { value: 'America/Los_Angeles', label: 'Pacífico — Los Ángeles, San Francisco' },
+      { value: 'America/Anchorage',   label: 'Alaska' },
+      { value: 'Pacific/Honolulu',    label: 'Hawái' },
+    ],
+  },
+  {
+    group: 'México',
+    options: [
+      { value: 'America/Mexico_City', label: 'Ciudad de México, Guadalajara, Monterrey' },
+      { value: 'America/Cancun',      label: 'Cancún, Mérida, Chetumal' },
+      { value: 'America/Chihuahua',   label: 'Chihuahua, Mazatlán' },
+      { value: 'America/Tijuana',     label: 'Tijuana, Mexicali, Baja California' },
+    ],
+  },
+  {
+    group: 'Centroamérica y el Caribe',
+    options: [
+      { value: 'America/Guatemala',     label: 'Guatemala, El Salvador, Honduras' },
+      { value: 'America/Costa_Rica',    label: 'Costa Rica' },
+      { value: 'America/Managua',       label: 'Nicaragua' },
+      { value: 'America/Panama',        label: 'Panamá' },
+      { value: 'America/Havana',        label: 'Cuba' },
+      { value: 'America/Puerto_Rico',   label: 'Puerto Rico' },
+      { value: 'America/Santo_Domingo', label: 'República Dominicana' },
+      { value: 'America/Jamaica',       label: 'Jamaica' },
+    ],
+  },
+  {
+    group: 'Sudamérica',
+    options: [
+      { value: 'America/Bogota',                  label: 'Colombia, Ecuador (oeste)' },
+      { value: 'America/Guayaquil',               label: 'Ecuador' },
+      { value: 'America/Lima',                    label: 'Perú' },
+      { value: 'America/Caracas',                 label: 'Venezuela' },
+      { value: 'America/La_Paz',                  label: 'Bolivia' },
+      { value: 'America/Asuncion',                label: 'Paraguay' },
+      { value: 'America/Argentina/Buenos_Aires',  label: 'Argentina' },
+      { value: 'America/Montevideo',              label: 'Uruguay' },
+      { value: 'America/Santiago',                label: 'Chile' },
+    ],
+  },
+  {
+    group: 'España',
+    options: [
+      { value: 'Europe/Madrid', label: 'España (Península y Baleares)' },
+      { value: 'Atlantic/Canary', label: 'España (Islas Canarias)' },
+    ],
+  },
+];
+
+const ALL_TZ_VALUES = TIMEZONE_GROUPS.flatMap((g) => g.options.map((o) => o.value));
+
 export default function PreferencesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -141,16 +204,25 @@ export default function PreferencesPage() {
         {/* Timezone */}
         <div>
           <label className="mb-1 block text-sm font-medium text-zinc-700">Zona horaria</label>
-          <input
-            type="text"
+          <select
             value={timeZone}
             onChange={(e) => setTimeZone(e.target.value)}
-            placeholder="America/Mexico_City"
             className="w-full rounded-lg border border-zinc-300 px-4 py-3 text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-          <p className="mt-1 text-xs text-zinc-500">
-            Zona detectada automáticamente: {Intl.DateTimeFormat().resolvedOptions().timeZone}
-          </p>
+          >
+            {/* Fallback option if saved value isn't in the curated list */}
+            {timeZone && !ALL_TZ_VALUES.includes(timeZone) && (
+              <option value={timeZone}>{timeZone}</option>
+            )}
+            {TIMEZONE_GROUPS.map((group) => (
+              <optgroup key={group.group} label={group.group}>
+                {group.options.map((tz) => (
+                  <option key={tz.value} value={tz.value}>
+                    {tz.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
         </div>
 
         {/* Email notifications toggle */}

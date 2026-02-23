@@ -58,14 +58,14 @@ describe('PreferencesPage', () => {
   it('loads existing preferences from profile', async () => {
     render(<PreferencesPage />);
     await waitFor(() => {
-      expect(screen.getByDisplayValue('America/Mexico_City')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Ciudad de México, Guadalajara, Monterrey')).toBeInTheDocument();
     });
   });
 
   it('save button disabled when no changes', async () => {
     render(<PreferencesPage />);
     await waitFor(() => {
-      expect(screen.getByDisplayValue('America/Mexico_City')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Ciudad de México, Guadalajara, Monterrey')).toBeInTheDocument();
     });
 
     const saveButton = screen.getByRole('button', { name: /guardar/i });
