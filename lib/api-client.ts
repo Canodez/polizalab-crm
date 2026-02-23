@@ -122,16 +122,22 @@ export const profileApi = {
       profileImageUrl: string | null;
       createdAt: string;
       lastLoginAt?: string;
+      preferredLanguage?: string;
+      timeZone?: string;
+      emailNotificationsEnabled?: boolean;
     }>('/profile');
   },
 
   /**
    * Update user profile
    */
-  async updateProfile(data: { 
-    nombre?: string; 
+  async updateProfile(data: {
+    nombre?: string;
     apellido?: string;
     profileImageUrl?: string;
+    preferredLanguage?: string;
+    timeZone?: string;
+    emailNotificationsEnabled?: boolean;
   }) {
     return apiRequest<{ success: boolean }>('/profile', {
       method: 'PUT',

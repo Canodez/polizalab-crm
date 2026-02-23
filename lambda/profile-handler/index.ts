@@ -16,6 +16,9 @@ interface UpdateProfileRequestBody {
   nombre?: string;
   apellido?: string;
   profileImageUrl?: string;
+  preferredLanguage?: string;
+  timeZone?: string;
+  emailNotificationsEnabled?: boolean;
 }
 
 interface ProfileImageRequestBody {
@@ -180,11 +183,18 @@ async function handleUpdateProfile(
     const body: UpdateProfileRequestBody = JSON.parse(event.body);
 
     // Validate that at least one field is provided
-    if (!body.nombre && !body.apellido && !body.profileImageUrl) {
+    if (
+      body.nombre === undefined &&
+      body.apellido === undefined &&
+      body.profileImageUrl === undefined &&
+      body.preferredLanguage === undefined &&
+      body.timeZone === undefined &&
+      body.emailNotificationsEnabled === undefined
+    ) {
       return createErrorResponse(
         400,
         'VALIDATION_ERROR',
-        'At least one field (nombre, apellido, or profileImageUrl) is required'
+        'At least one field is required'
       );
     }
 
@@ -226,6 +236,24 @@ async function handleUpdateProfile(
       updateExpressions.push('#profileImageUrl = :profileImageUrl');
       expressionAttributeNames['#profileImageUrl'] = 'profileImageUrl';
       expressionAttributeValues[':profileImageUrl'] = body.profileImageUrl;
+    }
+
+    if (body.preferredLanguage !== undefined) {
+      updateExpressions.push('#preferredLanguage = :preferredLanguage');
+      expressionAttributeNames['#preferredLanguage'] = 'preferredLanguage';
+      expressionAttributeValues[':preferredLanguage'] = body.preferredLanguage;
+    }
+
+    if (body.timeZone !== undefined) {
+      updateExpressions.push('#timeZone = :timeZone');
+      expressionAttributeNames['#timeZone'] = 'timeZone';
+      expressionAttributeValues[':timeZone'] = body.timeZone;
+    }
+
+    if (body.emailNotificationsEnabled !== undefined) {
+      updateExpressions.push('#emailNotificationsEnabled = :emailNotificationsEnabled');
+      expressionAttributeNames['#emailNotificationsEnabled'] = 'emailNotificationsEnabled';
+      expressionAttributeValues[':emailNotificationsEnabled'] = body.emailNotificationsEnabled;
     }
 
     await docClient.send(

@@ -7,6 +7,10 @@ export interface User {
   profileImage: string | null; // S3 key (e.g., profiles/{userId}/{filename})
   profileImageUrl: string | null; // Full URL to access the image
   createdAt: string;
+  lastLoginAt?: string;
+  preferredLanguage?: string;        // e.g. 'es'
+  timeZone?: string;                 // IANA tz, e.g. 'America/Mexico_City'
+  emailNotificationsEnabled?: boolean;
 }
 
 // Policy types

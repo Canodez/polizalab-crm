@@ -136,7 +136,7 @@ export default function Navbar() {
                     <ul role="list" className="flex flex-1 flex-col gap-y-2">
                       <li>
                         <button
-                          onClick={() => handleNavigation('/profile')}
+                          onClick={() => handleNavigation('/account/profile')}
                           className="group flex w-full items-center gap-x-3 rounded-md p-3 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900"
                         >
                           <UserCircleIcon className="h-6 w-6 text-gray-400 group-hover:text-gray-500" />
@@ -145,7 +145,7 @@ export default function Navbar() {
                       </li>
                       <li>
                         <button
-                          onClick={() => handleNavigation('/security')}
+                          onClick={() => handleNavigation('/account/security')}
                           className="group flex w-full items-center gap-x-3 rounded-md p-3 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900"
                         >
                           <LockClosedIcon className="h-6 w-6 text-gray-400 group-hover:text-gray-500" />
@@ -154,7 +154,7 @@ export default function Navbar() {
                       </li>
                       <li>
                         <button
-                          onClick={() => handleNavigation('/settings')}
+                          onClick={() => handleNavigation('/account/preferences')}
                           className="group flex w-full items-center gap-x-3 rounded-md p-3 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900"
                         >
                           <Cog6ToothIcon className="h-6 w-6 text-gray-400 group-hover:text-gray-500" />

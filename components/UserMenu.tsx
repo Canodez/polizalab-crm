@@ -78,7 +78,7 @@ export default function UserMenu() {
             <Menu.Item>
               {({ active }) => (
                 <button
-                  onClick={() => router.push('/profile')}
+                  onClick={() => router.push('/account/profile')}
                   className={`${
                     active ? 'bg-gray-100' : ''
                   } group flex w-full items-center px-4 py-2 text-sm text-gray-700`}
@@ -92,7 +92,7 @@ export default function UserMenu() {
             <Menu.Item>
               {({ active }) => (
                 <button
-                  onClick={() => router.push('/security')}
+                  onClick={() => router.push('/account/security')}
                   className={`${
                     active ? 'bg-gray-100' : ''
                   } group flex w-full items-center px-4 py-2 text-sm text-gray-700`}
@@ -106,7 +106,7 @@ export default function UserMenu() {
             <Menu.Item>
               {({ active }) => (
                 <button
-                  onClick={() => router.push('/settings')}
+                  onClick={() => router.push('/account/preferences')}
                   className={`${
                     active ? 'bg-gray-100' : ''
                   } group flex w-full items-center px-4 py-2 text-sm text-gray-700`}
