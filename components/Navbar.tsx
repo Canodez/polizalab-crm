@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, Fragment } from 'react';
+import Link from 'next/link';
 import { Dialog, Transition } from '@headlessui/react';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
@@ -12,6 +13,7 @@ import {
   LockClosedIcon,
   Cog6ToothIcon,
   ArrowRightOnRectangleIcon,
+  ClipboardDocumentListIcon,
 } from '@heroicons/react/24/outline';
 
 /**
@@ -50,8 +52,14 @@ export default function Navbar() {
             </h1>
           </div>
 
-          {/* Desktop: UserMenu dropdown (hidden on mobile) */}
+          {/* Desktop: nav links + UserMenu dropdown (hidden on mobile) */}
           <div className="hidden md:flex items-center gap-4 md:gap-6">
+            <Link
+              href="/policies"
+              className="text-sm font-medium text-gray-700 hover:text-gray-900"
+            >
+              Pólizas
+            </Link>
             <UserMenu />
           </div>
 
@@ -134,6 +142,15 @@ export default function Navbar() {
                   {/* Navigation menu */}
                   <nav className="flex flex-1 flex-col">
                     <ul role="list" className="flex flex-1 flex-col gap-y-2">
+                      <li>
+                        <button
+                          onClick={() => handleNavigation('/policies')}
+                          className="group flex w-full items-center gap-x-3 rounded-md p-3 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                        >
+                          <ClipboardDocumentListIcon className="h-6 w-6 text-gray-400 group-hover:text-gray-500" />
+                          Pólizas
+                        </button>
+                      </li>
                       <li>
                         <button
                           onClick={() => handleNavigation('/account/profile')}

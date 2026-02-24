@@ -59,7 +59,7 @@ export class ApiError extends Error {
 /**
  * Make authenticated API request
  */
-async function apiRequest<T>(
+export async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {

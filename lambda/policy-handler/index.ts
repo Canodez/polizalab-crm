@@ -10,13 +10,21 @@ const s3Client = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' })
 const POLICIES_TABLE = process.env.DYNAMODB_POLICIES_TABLE || 'Policies';
 const S3_BUCKET = process.env.S3_BUCKET_NAME || 'polizalab-documents-dev';
 
+// HTTP API v2 payload format (used by API Gateway HTTP APIs)
 interface APIGatewayEvent {
-  httpMethod: string;
-  path: string;
-  pathParameters?: { id?: string };
+  routeKey?: string;
+  rawPath?: string;
+  // v1 REST API fallbacks
+  httpMethod?: string;
+  path?: string;
+  pathParameters?: { [key: string]: string };
   headers: { [key: string]: string };
   body?: string;
   requestContext?: {
+    http?: {
+      method: string;
+      path: string;
+    };
     authorizer?: {
       jwt?: {
         claims?: {
@@ -123,7 +131,7 @@ async function listPolicies(userId: string): Promise<any> {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
     },
-    body: JSON.stringify({ policies }),
+    body: JSON.stringify({ policies, count: policies.length }),
   };
 }
 
@@ -304,24 +312,15 @@ async function getUpcomingRenewals(userId: string): Promise<any> {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
     },
-    body: JSON.stringify({ renewals: urgentPolicies }),
+    body: JSON.stringify({ policies: urgentPolicies, count: urgentPolicies.length }),
   };
 }
 
 // POST /policies/upload-url - Generate pre-signed URL for document upload
 async function getDocumentUploadUrl(userId: string, body: any): Promise<any> {
-  const { fileName, fileType } = body;
-
-  if (!fileName || !fileType) {
-    return {
-      statusCode: 400,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
-      body: JSON.stringify({ error: 'fileName and fileType are required' }),
-    };
-  }
+  // fileName and fileType are optional — defaults to a UUID-named PDF
+  const fileName = body.fileName || `policy-${uuidv4()}.pdf`;
+  const fileType = body.fileType || 'application/pdf';
 
   const s3Key = `policies/${userId}/${uuidv4()}/${fileName}`;
 
@@ -361,8 +360,9 @@ export async function handler(event: APIGatewayEvent): Promise<any> {
       };
     }
 
-    const method = event.httpMethod;
-    const path = event.path;
+    // Support both HTTP API v2 (rawPath / requestContext.http.method) and REST API v1 (path / httpMethod)
+    const method = event.requestContext?.http?.method || event.httpMethod || '';
+    const path = event.rawPath || event.path || '';
 
     // Route requests
     if (method === 'GET' && path === '/policies') {

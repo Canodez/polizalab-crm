@@ -1,0 +1,259 @@
+{
+  "blocks": [
+    {
+      "Id": "page-1",
+      "BlockType": "PAGE",
+      "Confidence": 99.9,
+      "Relationships": [{"Type": "CHILD", "Ids": ["line-1", "line-2", "line-3", "line-4", "line-5", "line-6", "line-7", "line-8", "kv-key-1", "kv-val-1", "kv-key-2", "kv-val-2", "kv-key-3", "kv-val-3", "kv-key-4", "kv-val-4", "kv-key-5", "kv-val-5"]}]
+    },
+    {
+      "Id": "line-1",
+      "BlockType": "LINE",
+      "Text": "AXA SEGUROS S.A. DE C.V.",
+      "Confidence": 99.2,
+      "Relationships": [{"Type": "CHILD", "Ids": ["word-1"]}]
+    },
+    {
+      "Id": "word-1",
+      "BlockType": "WORD",
+      "Text": "AXA SEGUROS S.A. DE C.V.",
+      "Confidence": 99.2
+    },
+    {
+      "Id": "line-2",
+      "BlockType": "LINE",
+      "Text": "SEGURO DE AUTOMÓVIL",
+      "Confidence": 98.5,
+      "Relationships": [{"Type": "CHILD", "Ids": ["word-2"]}]
+    },
+    {
+      "Id": "word-2",
+      "BlockType": "WORD",
+      "Text": "SEGURO DE AUTOMÓVIL",
+      "Confidence": 98.5
+    },
+    {
+      "Id": "line-3",
+      "BlockType": "LINE",
+      "Text": "Póliza No. MX-2024-001234",
+      "Confidence": 96.1,
+      "Relationships": [{"Type": "CHILD", "Ids": ["word-3"]}]
+    },
+    {
+      "Id": "word-3",
+      "BlockType": "WORD",
+      "Text": "MX-2024-001234",
+      "Confidence": 96.1
+    },
+    {
+      "Id": "line-4",
+      "BlockType": "LINE",
+      "Text": "Vigencia: 01/01/2026 al 31/12/2026",
+      "Confidence": 94.0,
+      "Relationships": [{"Type": "CHILD", "Ids": ["word-4"]}]
+    },
+    {
+      "Id": "word-4",
+      "BlockType": "WORD",
+      "Text": "01/01/2026 al 31/12/2026",
+      "Confidence": 94.0
+    },
+    {
+      "Id": "line-5",
+      "BlockType": "LINE",
+      "Text": "Prima Total: 12,500.00 MXN",
+      "Confidence": 97.3,
+      "Relationships": [{"Type": "CHILD", "Ids": ["word-5"]}]
+    },
+    {
+      "Id": "word-5",
+      "BlockType": "WORD",
+      "Text": "12,500.00",
+      "Confidence": 97.3
+    },
+    {
+      "Id": "line-6",
+      "BlockType": "LINE",
+      "Text": "RFC: GAJU8001011H2",
+      "Confidence": 93.5,
+      "Relationships": [{"Type": "CHILD", "Ids": ["word-6"]}]
+    },
+    {
+      "Id": "word-6",
+      "BlockType": "WORD",
+      "Text": "GAJU8001011H2",
+      "Confidence": 93.5
+    },
+    {
+      "Id": "line-7",
+      "BlockType": "LINE",
+      "Text": "Página 1 de 3",
+      "Confidence": 99.8,
+      "Relationships": [{"Type": "CHILD", "Ids": ["word-7"]}]
+    },
+    {
+      "Id": "word-7",
+      "BlockType": "WORD",
+      "Text": "Página 1 de 3",
+      "Confidence": 99.8
+    },
+    {
+      "Id": "line-8",
+      "BlockType": "LINE",
+      "Text": "MX-2024-001234",
+      "Confidence": 95.0,
+      "Relationships": [{"Type": "CHILD", "Ids": ["word-8"]}]
+    },
+    {
+      "Id": "word-8",
+      "BlockType": "WORD",
+      "Text": "MX-2024-001234",
+      "Confidence": 95.0
+    },
+    {
+      "Id": "kv-key-1",
+      "BlockType": "KEY_VALUE_SET",
+      "EntityTypes": ["KEY"],
+      "Confidence": 96.5,
+      "Relationships": [
+        {"Type": "CHILD", "Ids": ["kv-key-1-word"]},
+        {"Type": "VALUE", "Ids": ["kv-val-1"]}
+      ]
+    },
+    {
+      "Id": "kv-key-1-word",
+      "BlockType": "WORD",
+      "Text": "Asegurado",
+      "Confidence": 96.5
+    },
+    {
+      "Id": "kv-val-1",
+      "BlockType": "KEY_VALUE_SET",
+      "EntityTypes": ["VALUE"],
+      "Confidence": 95.0,
+      "Relationships": [{"Type": "CHILD", "Ids": ["kv-val-1-word"]}]
+    },
+    {
+      "Id": "kv-val-1-word",
+      "BlockType": "WORD",
+      "Text": "Juan García López",
+      "Confidence": 95.0
+    },
+    {
+      "Id": "kv-key-2",
+      "BlockType": "KEY_VALUE_SET",
+      "EntityTypes": ["KEY"],
+      "Confidence": 97.8,
+      "Relationships": [
+        {"Type": "CHILD", "Ids": ["kv-key-2-word"]},
+        {"Type": "VALUE", "Ids": ["kv-val-2"]}
+      ]
+    },
+    {
+      "Id": "kv-key-2-word",
+      "BlockType": "WORD",
+      "Text": "Póliza",
+      "Confidence": 97.8
+    },
+    {
+      "Id": "kv-val-2",
+      "BlockType": "KEY_VALUE_SET",
+      "EntityTypes": ["VALUE"],
+      "Confidence": 96.2,
+      "Relationships": [{"Type": "CHILD", "Ids": ["kv-val-2-word"]}]
+    },
+    {
+      "Id": "kv-val-2-word",
+      "BlockType": "WORD",
+      "Text": "MX-2024-001234",
+      "Confidence": 96.2
+    },
+    {
+      "Id": "kv-key-3",
+      "BlockType": "KEY_VALUE_SET",
+      "EntityTypes": ["KEY"],
+      "Confidence": 98.1,
+      "Relationships": [
+        {"Type": "CHILD", "Ids": ["kv-key-3-word"]},
+        {"Type": "VALUE", "Ids": ["kv-val-3"]}
+      ]
+    },
+    {
+      "Id": "kv-key-3-word",
+      "BlockType": "WORD",
+      "Text": "Inicio de vigencia",
+      "Confidence": 98.1
+    },
+    {
+      "Id": "kv-val-3",
+      "BlockType": "KEY_VALUE_SET",
+      "EntityTypes": ["VALUE"],
+      "Confidence": 94.5,
+      "Relationships": [{"Type": "CHILD", "Ids": ["kv-val-3-word"]}]
+    },
+    {
+      "Id": "kv-val-3-word",
+      "BlockType": "WORD",
+      "Text": "01/01/2026",
+      "Confidence": 94.5
+    },
+    {
+      "Id": "kv-key-4",
+      "BlockType": "KEY_VALUE_SET",
+      "EntityTypes": ["KEY"],
+      "Confidence": 97.3,
+      "Relationships": [
+        {"Type": "CHILD", "Ids": ["kv-key-4-word"]},
+        {"Type": "VALUE", "Ids": ["kv-val-4"]}
+      ]
+    },
+    {
+      "Id": "kv-key-4-word",
+      "BlockType": "WORD",
+      "Text": "Fin de vigencia",
+      "Confidence": 97.3
+    },
+    {
+      "Id": "kv-val-4",
+      "BlockType": "KEY_VALUE_SET",
+      "EntityTypes": ["VALUE"],
+      "Confidence": 94.0,
+      "Relationships": [{"Type": "CHILD", "Ids": ["kv-val-4-word"]}]
+    },
+    {
+      "Id": "kv-val-4-word",
+      "BlockType": "WORD",
+      "Text": "31/12/2026",
+      "Confidence": 94.0
+    },
+    {
+      "Id": "kv-key-5",
+      "BlockType": "KEY_VALUE_SET",
+      "EntityTypes": ["KEY"],
+      "Confidence": 96.9,
+      "Relationships": [
+        {"Type": "CHILD", "Ids": ["kv-key-5-word"]},
+        {"Type": "VALUE", "Ids": ["kv-val-5"]}
+      ]
+    },
+    {
+      "Id": "kv-key-5-word",
+      "BlockType": "WORD",
+      "Text": "Prima total",
+      "Confidence": 96.9
+    },
+    {
+      "Id": "kv-val-5",
+      "BlockType": "KEY_VALUE_SET",
+      "EntityTypes": ["VALUE"],
+      "Confidence": 97.1,
+      "Relationships": [{"Type": "CHILD", "Ids": ["kv-val-5-word"]}]
+    },
+    {
+      "Id": "kv-val-5-word",
+      "BlockType": "WORD",
+      "Text": "12,500.00",
+      "Confidence": 97.1
+    }
+  ]
+}

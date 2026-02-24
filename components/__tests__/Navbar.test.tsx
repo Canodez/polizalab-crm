@@ -12,6 +12,12 @@ jest.mock('@/lib/auth-context', () => ({
   useAuth: jest.fn(),
 }));
 
+jest.mock('next/link', () => {
+  return function MockLink({ href, children }: { href: string; children: React.ReactNode }) {
+    return <a href={href}>{children}</a>;
+  };
+});
+
 jest.mock('../UserMenu', () => {
   return function MockUserMenu() {
     return <div data-testid="user-menu">UserMenu</div>;
@@ -42,9 +48,15 @@ describe('Navbar', () => {
   describe('Desktop view', () => {
     it('should render logo and UserMenu on desktop', () => {
       render(<Navbar />);
-      
+
       expect(screen.getByText('PolizaLab CRM')).toBeInTheDocument();
       expect(screen.getByTestId('user-menu')).toBeInTheDocument();
+    });
+
+    it('should render "Pólizas" link on desktop', () => {
+      render(<Navbar />);
+      const link = screen.getByRole('link', { name: 'Pólizas' });
+      expect(link).toHaveAttribute('href', '/policies');
     });
 
     it('should not show hamburger menu on desktop', () => {
@@ -99,16 +111,33 @@ describe('Navbar', () => {
 
     it('should show navigation options in drawer', async () => {
       render(<Navbar />);
-      
+
       const hamburgerButton = screen.getByLabelText('Abrir menú');
       fireEvent.click(hamburgerButton);
 
       await waitFor(() => {
+        // 'Pólizas' appears both in desktop link and drawer button
+        expect(screen.getAllByText('Pólizas').length).toBeGreaterThan(0);
         expect(screen.getByText('Mi perfil')).toBeInTheDocument();
         expect(screen.getByText('Seguridad')).toBeInTheDocument();
         expect(screen.getByText('Configuración')).toBeInTheDocument();
         expect(screen.getByText('Cerrar sesión')).toBeInTheDocument();
       });
+    });
+
+    it('should navigate to /policies when "Pólizas" is clicked in drawer', async () => {
+      render(<Navbar />);
+
+      const hamburgerButton = screen.getByLabelText('Abrir menú');
+      fireEvent.click(hamburgerButton);
+
+      await waitFor(() => {
+        // Use role=button to target the drawer button, not the desktop <a> link
+        const polizasButton = screen.getByRole('button', { name: /Pólizas/i });
+        fireEvent.click(polizasButton);
+      });
+
+      expect(mockPush).toHaveBeenCalledWith('/policies');
     });
 
     it('should navigate to profile when "Mi perfil" is clicked', async () => {
