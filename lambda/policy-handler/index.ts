@@ -1,5 +1,5 @@
-import { DynamoDBClient, QueryCommand, GetItemCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { DynamoDBClient, QueryCommand, GetItemCommand, UpdateItemCommand, DeleteItemCommand } from '@aws-sdk/client-dynamodb';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
 import { v4 as uuidv4 } from 'uuid';
@@ -342,6 +342,56 @@ async function getDocumentUploadUrl(userId: string, body: any): Promise<any> {
   };
 }
 
+// DELETE /policies/:id - Delete policy and its S3 files
+async function deletePolicy(userId: string, policyId: string): Promise<any> {
+  const tenantId = process.env.TENANT_ID || 'default';
+
+  const getResult = await dynamoClient.send(new GetItemCommand({
+    TableName: POLICIES_TABLE,
+    Key: marshall({ tenantId, policyId }),
+  }));
+
+  if (!getResult.Item) {
+    return {
+      statusCode: 404,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      body: JSON.stringify({ error: 'Policy not found' }),
+    };
+  }
+
+  const policy = unmarshall(getResult.Item) as Policy & { s3KeyOriginal?: string; s3KeyTextractResult?: string; s3Bucket?: string };
+
+  if (policy.userId !== userId) {
+    return {
+      statusCode: 403,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      body: JSON.stringify({ error: 'Forbidden' }),
+    };
+  }
+
+  const bucket = policy.s3Bucket || S3_BUCKET;
+  const s3Keys = [
+    policy.s3KeyOriginal,
+    policy.s3KeyTextractResult,
+    policy.s3KeyTextractResult ? policy.s3KeyTextractResult.replace(/\/[^/]+$/, '/text.txt') : null,
+  ].filter(Boolean) as string[];
+
+  await Promise.allSettled(
+    s3Keys.map(key => s3Client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key })))
+  );
+
+  await dynamoClient.send(new DeleteItemCommand({
+    TableName: POLICIES_TABLE,
+    Key: marshall({ tenantId, policyId }),
+  }));
+
+  return {
+    statusCode: 200,
+    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    body: JSON.stringify({ success: true }),
+  };
+}
+
 // Main Lambda handler
 export async function handler(event: APIGatewayEvent): Promise<any> {
   console.log('Event:', JSON.stringify(event, null, 2));
@@ -385,6 +435,10 @@ export async function handler(event: APIGatewayEvent): Promise<any> {
     if (method === 'POST' && path === '/policies/upload-url') {
       const body = JSON.parse(event.body || '{}');
       return await getDocumentUploadUrl(userId, body);
+    }
+
+    if (method === 'DELETE' && path.startsWith('/policies/') && event.pathParameters?.id) {
+      return await deletePolicy(userId, event.pathParameters.id);
     }
 
     return {

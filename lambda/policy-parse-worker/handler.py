@@ -15,7 +15,7 @@ import boto3
 from botocore.exceptions import ClientError
 from dateutil.relativedelta import relativedelta
 
-import extractor as field_extractor
+import claude_extractor
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -167,9 +167,16 @@ def process_record(record: dict) -> None:
         logger.error("GetDocumentAnalysis failed: %s", e)
         raise  # SQS retry
 
+    # Assemble raw text from LINE blocks
+    raw_text = "\n".join(
+        b["Text"] for b in blocks
+        if b.get("BlockType") == "LINE" and b.get("Text")
+    )
+
+    s3_bucket = item.get("s3Bucket", os.environ.get("S3_BUCKET", "polizalab-documents-dev"))
+
     # Save raw Textract result to S3
     if s3_key_textract_result:
-        s3_bucket = item.get("s3Bucket", os.environ.get("S3_BUCKET", "polizalab-documents-dev"))
         try:
             get_s3().put_object(
                 Bucket=s3_bucket,
@@ -180,10 +187,31 @@ def process_record(record: dict) -> None:
         except ClientError as e:
             logger.warning("Could not save Textract result to S3: %s", e)
 
-    # Extract fields
-    fields = field_extractor.extract_fields(blocks)
+    # Save raw text to S3
+    if s3_key_textract_result:
+        s3_key_text = s3_key_textract_result.rsplit("/", 1)[0] + "/text.txt"
+    else:
+        s3_key_original = item.get("s3KeyOriginal", "")
+        s3_key_text = (
+            s3_key_original.rsplit("/", 1)[0] + "/textract/text.txt"
+            if s3_key_original else None
+        )
+    if s3_key_text:
+        try:
+            get_s3().put_object(
+                Bucket=s3_bucket,
+                Key=s3_key_text,
+                Body=raw_text.encode("utf-8"),
+                ContentType="text/plain",
+            )
+        except ClientError as e:
+            logger.warning("Could not save text.txt to S3: %s", e)
+
+    # Extract fields using Claude
+    fields = claude_extractor.extract_fields(raw_text)
     field_confidence = floats_to_decimals(fields.pop("fieldConfidence", {}))
     needs_review_fields = fields.pop("needsReviewFields", [])
+    fields = floats_to_decimals(fields)  # e.g. premiumTotal comes back as float
 
     # Compute renewal date
     policy_type = fields.get("policyType") or item.get("policyType")

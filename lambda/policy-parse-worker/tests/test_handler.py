@@ -10,10 +10,33 @@ import boto3
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import handler as parse_handler
-import extractor
+import claude_extractor
 
 
 FIXTURE_PATH = os.path.join(os.path.dirname(__file__), "fixtures", "textract_response.json")
+
+# A fully-extracted result returned by the mocked Claude extractor
+GOOD_FIELDS = {
+    "policyNumber": "MX-2026-001234",
+    "insuredName": "Juan García López",
+    "policyType": "Seguro de Autos",
+    "insurer": "AXA Seguros",
+    "startDate": "2026-01-01",
+    "endDate": "2027-01-01",
+    "premiumTotal": 12500.00,
+    "currency": "MXN",
+    "fieldConfidence": {
+        "policyNumber": 0.98,
+        "insuredName": 0.97,
+        "policyType": 0.95,
+        "insurer": 0.99,
+        "startDate": 0.98,
+        "endDate": 0.98,
+        "premiumTotal": 0.96,
+        "currency": 1.0,
+    },
+    "needsReviewFields": [],
+}
 
 
 @pytest.fixture(autouse=True)
@@ -107,7 +130,8 @@ class TestParseWorkerHandler:
 
         with patch.object(parse_handler, "get_textract", return_value=mock_textract):
             with patch.object(parse_handler, "get_s3", return_value=mock_s3):
-                parse_handler.handler(make_event("job-1", "SUCCEEDED"))
+                with patch.object(claude_extractor, "extract_fields", return_value=dict(GOOD_FIELDS)):
+                    parse_handler.handler(make_event("job-1", "SUCCEEDED"))
 
         mock_textract.get_document_analysis.assert_called_once_with(JobId="job-1")
 
@@ -132,45 +156,36 @@ class TestParseWorkerHandler:
 
         with patch.object(parse_handler, "get_textract", return_value=mock_textract):
             with patch.object(parse_handler, "get_s3", return_value=mock_s3):
-                parse_handler.handler(make_event("job-ok", "SUCCEEDED"))
+                with patch.object(claude_extractor, "extract_fields", return_value=dict(GOOD_FIELDS)):
+                    parse_handler.handler(make_event("job-ok", "SUCCEEDED"))
 
         item = setup_aws_with_policy.get_item(
             Key={"tenantId": "default", "policyId": "pol-1"}
         ).get("Item")
-        # Should be EXTRACTED (all required fields present with sufficient confidence)
-        # or NEEDS_REVIEW if confidence is marginal
-        assert item["status"] in ("EXTRACTED", "NEEDS_REVIEW")
+        assert item["status"] == "EXTRACTED"
         assert "extractionVersion" in item
         assert "fieldConfidence" in item
 
     def test_low_confidence_triggers_needs_review(self, setup_aws_with_policy):
-        """Low confidence blocks → NEEDS_REVIEW with needsReviewFields populated."""
-        # Blocks with very low confidence
-        low_conf_blocks = [
-            {
-                "Id": "kv-k", "BlockType": "KEY_VALUE_SET", "EntityTypes": ["KEY"],
-                "Confidence": 20.0,
-                "Relationships": [
-                    {"Type": "CHILD", "Ids": ["kv-k-w"]},
-                    {"Type": "VALUE", "Ids": ["kv-v"]},
-                ],
+        """Claude returning low-confidence fields → NEEDS_REVIEW with needsReviewFields populated."""
+        low_conf_fields = {
+            "policyNumber": "MX-123",
+            "fieldConfidence": {
+                "policyNumber": 0.4,
             },
-            {"Id": "kv-k-w", "BlockType": "WORD", "Text": "póliza", "Confidence": 20.0},
-            {
-                "Id": "kv-v", "BlockType": "KEY_VALUE_SET", "EntityTypes": ["VALUE"],
-                "Confidence": 15.0,
-                "Relationships": [{"Type": "CHILD", "Ids": ["kv-v-w"]}],
-            },
-            {"Id": "kv-v-w", "BlockType": "WORD", "Text": "XX-123", "Confidence": 15.0},
-        ]
+            "needsReviewFields": ["policyNumber", "insuredName", "startDate", "endDate"],
+        }
 
         mock_textract = MagicMock()
-        mock_textract.get_document_analysis.return_value = {"Blocks": low_conf_blocks}
+        mock_textract.get_document_analysis.return_value = {"Blocks": [
+            {"Id": "line-1", "BlockType": "LINE", "Text": "MX-123", "Confidence": 40.0}
+        ]}
         mock_s3 = MagicMock()
 
         with patch.object(parse_handler, "get_textract", return_value=mock_textract):
             with patch.object(parse_handler, "get_s3", return_value=mock_s3):
-                parse_handler.handler(make_event("job-low-conf", "SUCCEEDED"))
+                with patch.object(claude_extractor, "extract_fields", return_value=low_conf_fields):
+                    parse_handler.handler(make_event("job-low-conf", "SUCCEEDED"))
 
         item = setup_aws_with_policy.get_item(
             Key={"tenantId": "default", "policyId": "pol-1"}

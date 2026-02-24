@@ -50,6 +50,9 @@ export default function PolicyDetailClient() {
   const [saveError, setSaveError] = useState('');
   const [isEditMode, setIsEditMode] = useState(false);
   const [pollTimedOut, setPollTimedOut] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   // Edit form fields
   const [policyNumber, setPolicyNumber] = useState('');
@@ -174,6 +177,23 @@ export default function PolicyDetailClient() {
     }
   };
 
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    setDeleteError('');
+    try {
+      await policiesApi.deletePolicy(policyId);
+      router.push('/policies');
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setDeleteError(err.message);
+      } else {
+        setDeleteError('Error al eliminar la póliza');
+      }
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
   const handleRetry = async () => {
     if (!policy) return;
     setSaveError('');
@@ -265,7 +285,7 @@ export default function PolicyDetailClient() {
           </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-zinc-900">
-              {policy.policyType || 'Tipo desconocido'}
+              {policy.policyType || policy.sourceFileName || 'Tipo desconocido'}
             </p>
             {policy.policyNumber && (
               <p className="text-xs text-zinc-500">#{policy.policyNumber}</p>
@@ -328,6 +348,51 @@ export default function PolicyDetailClient() {
           )}
           <ReviewPanel policy={policy} onConfirm={handleConfirm} isSaving={isSaving} />
         </AccountCard>
+      )}
+
+      {/* ── DELETE SECTION ────────────────────────────────────────────────── */}
+      {!isProcessing && (
+        <div className="mt-6">
+          {deleteError && (
+            <div className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-600">{deleteError}</div>
+          )}
+          {!showDeleteConfirm ? (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="w-full rounded-lg border border-red-200 px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+              style={{ minHeight: '44px' }}
+            >
+              Eliminar póliza
+            </button>
+          ) : (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+              <p className="mb-1 text-sm font-semibold text-red-800">
+                ¿Eliminar esta póliza?
+              </p>
+              <p className="mb-4 text-xs text-red-600">
+                Se eliminará el documento y todos los datos. Esta acción no se puede deshacer.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className="flex-1 rounded-lg bg-red-600 px-4 py-3 text-sm font-medium text-white hover:bg-red-700 disabled:bg-red-300"
+                  style={{ minHeight: '44px' }}
+                >
+                  {isDeleting ? 'Eliminando...' : 'Sí, eliminar'}
+                </button>
+                <button
+                  onClick={() => { setShowDeleteConfirm(false); setDeleteError(''); }}
+                  disabled={isDeleting}
+                  className="flex-1 rounded-lg border border-red-200 bg-white px-4 py-3 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                  style={{ minHeight: '44px' }}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* ── EXTRACTED / VERIFIED ──────────────────────────────────────────── */}

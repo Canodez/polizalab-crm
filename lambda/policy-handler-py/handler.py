@@ -335,6 +335,37 @@ def post_ingest(user_id: str, policy_id: str) -> dict:
     return resp(200, {"policyId": policy_id, "status": "UPLOADED"})
 
 
+def delete_policy(user_id: str, policy_id: str) -> dict:
+    table = get_dynamodb().Table(POLICIES_TABLE)
+    result = table.get_item(Key={"tenantId": TENANT_ID, "policyId": policy_id})
+    item = result.get("Item")
+    if not item:
+        return resp(404, {"error": "Policy not found"})
+    if item.get("userId") != user_id:
+        return resp(403, {"error": "Forbidden"})
+
+    s3 = get_s3()
+    bucket = item.get("s3Bucket", S3_BUCKET)
+    keys_to_delete = [
+        item.get("s3KeyOriginal"),
+        item.get("s3KeyTextractResult"),
+    ]
+    # Also delete the text.txt sibling of the Textract result
+    if item.get("s3KeyTextractResult"):
+        import re
+        keys_to_delete.append(re.sub(r"/[^/]+$", "/text.txt", item["s3KeyTextractResult"]))
+
+    for key in keys_to_delete:
+        if key:
+            try:
+                s3.delete_object(Bucket=bucket, Key=key)
+            except Exception as e:
+                logger.warning("Could not delete S3 object %s: %s", key, e)
+
+    table.delete_item(Key={"tenantId": TENANT_ID, "policyId": policy_id})
+    return resp(200, {"success": True})
+
+
 FORBIDDEN_PATCH_FIELDS = {
     "tenantId", "policyId", "userId", "createdByUserId",
     "s3Bucket", "s3KeyOriginal", "s3KeyTextractResult", "textractJobId",
@@ -437,6 +468,10 @@ def handler(event: dict, context=None) -> dict:
         # PATCH /policies/{policyId}
         if method == "PATCH" and path_params.get("policyId"):
             return patch_policy(user_id, path_params["policyId"], body)
+
+        # DELETE /policies/{policyId}
+        if method == "DELETE" and path_params.get("policyId"):
+            return delete_policy(user_id, path_params["policyId"])
 
         return resp(404, {"error": "Not found"})
 

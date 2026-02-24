@@ -110,4 +110,8 @@ export const policiesApi = {
   async getRenewals(): Promise<{ policies: Policy[]; count: number }> {
     return apiRequest<{ policies: Policy[]; count: number }>('/policies/renewals');
   },
+
+  async deletePolicy(id: string): Promise<void> {
+    return apiRequest<void>(`/policies/${id}`, { method: 'DELETE' });
+  },
 };

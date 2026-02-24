@@ -48,7 +48,7 @@ export default function PolicyCard({ policy, onClick }: Props) {
   const IconComponent = typeConfig ? ICON_MAP[typeConfig.iconName] : undefined;
   const iconColor = typeConfig?.color ?? 'bg-zinc-100';
   const iconTextColor = typeConfig?.textColor ?? 'text-zinc-600';
-  const typeLabel = policy.policyType || 'Tipo desconocido';
+  const typeLabel = policy.policyType || policy.sourceFileName || 'Tipo desconocido';
 
   const clientName = policy.insuredName || 'Sin nombre';
   const dateLabel = formatDate(policy.fechaRenovacion || policy.endDate);

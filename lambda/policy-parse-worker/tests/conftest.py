@@ -6,7 +6,7 @@ import pytest
 import boto3
 from moto import mock_aws
 
-# Add lambda root to path so handler can import extractor
+# Add lambda root to path so handler can import claude_extractor
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ.setdefault("POLICIES_TABLE", "Policies")
