@@ -1,15 +1,27 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
-import Navbar from './Navbar';
+import { profileApi } from '@/lib/api-client';
+import { useSidebarState } from '@/lib/hooks/useSidebarState';
+import Sidebar from './Sidebar';
+import Avatar from './Avatar';
 import { Toaster } from 'react-hot-toast';
+import { Bars3Icon } from '@heroicons/react/24/outline';
 
-/**
- * LayoutContent component
- * Wraps the main content and conditionally shows Navbar when authenticated
- */
 export default function LayoutContent({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const { isCollapsed, toggleCollapsed, isMobileOpen, openMobile, closeMobile } = useSidebarState();
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+
+  const userEmail = user?.email;
+  useEffect(() => {
+    if (!userEmail) return;
+    profileApi.getProfile()
+      .then((p) => setProfileImageUrl(p.profileImageUrl || null))
+      .catch(() => {});
+  }, [userEmail]);
 
   return (
     <>
@@ -37,8 +49,38 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
           },
         }}
       />
-      {isAuthenticated && <Navbar />}
-      <main className={isAuthenticated ? 'pt-16 md:pt-20' : ''}>
+
+      {isAuthenticated && (
+        <>
+          <Sidebar
+            isCollapsed={isCollapsed}
+            toggleCollapsed={toggleCollapsed}
+            isMobileOpen={isMobileOpen}
+            closeMobile={closeMobile}
+          />
+
+          {/* Mobile top bar */}
+          <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-zinc-200 bg-white px-4 lg:hidden">
+            <div className="flex items-center gap-x-4">
+              <button
+                type="button"
+                onClick={openMobile}
+                className="-m-2.5 p-2.5 text-zinc-600 hover:text-zinc-900"
+                aria-label="Abrir menú"
+                aria-expanded={isMobileOpen}
+              >
+                <Bars3Icon className="h-6 w-6" />
+              </button>
+              <span className="text-lg font-semibold text-zinc-900 tracking-tight">PolizaLab</span>
+            </div>
+            <Link href="/account/profile" aria-label="Mi cuenta">
+              <Avatar email={userEmail || ''} imageUrl={profileImageUrl} size="sm" />
+            </Link>
+          </div>
+        </>
+      )}
+
+      <main className={isAuthenticated ? `min-h-screen ${isCollapsed ? 'lg:ml-16' : 'lg:ml-64'} transition-[margin] duration-200` : ''}>
         {children}
       </main>
     </>

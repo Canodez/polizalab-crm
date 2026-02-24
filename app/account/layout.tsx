@@ -17,7 +17,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
 
   if (authLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50">
+      <div className="flex min-h-[50vh] items-center justify-center bg-zinc-50">
         <div className="text-lg text-zinc-600">Cargando...</div>
       </div>
     );
@@ -28,7 +28,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50">
+    <div className="bg-zinc-50">
       {/* Page header */}
       <div className="bg-white border-b border-zinc-200">
         <div className="mx-auto max-w-2xl px-4 py-6">

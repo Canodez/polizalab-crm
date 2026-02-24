@@ -3,11 +3,12 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { 
-  ClipboardDocumentListIcon, 
-  UsersIcon, 
-  ChartBarIcon 
+import {
+  ClipboardDocumentListIcon,
+  UsersIcon,
+  ChartBarIcon
 } from '@heroicons/react/24/outline';
+import LoadingSpinner from '@/components/LoadingSpinner';
 
 export default function Home() {
   const router = useRouter();
@@ -16,61 +17,61 @@ export default function Home() {
   useEffect(() => {
     // Only redirect if auth is loaded and user is authenticated
     if (!isLoading && isAuthenticated) {
-      router.push('/profile');
+      router.push('/policies');
     }
   }, [isLoading, isAuthenticated, router]);
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-600">Cargando...</div>
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
+        <LoadingSpinner size="md" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-zinc-50">
       {/* Hero Section */}
       <div className="container mx-auto px-4 py-16">
         <div className="max-w-4xl mx-auto text-center">
           {/* Logo/Title */}
           <div className="mb-8">
-            <h1 className="text-5xl font-bold text-gray-900 mb-4">
+            <h1 className="text-4xl sm:text-5xl font-bold text-zinc-900 mb-4">
               PolizaLab
             </h1>
-            <p className="text-xl text-gray-600">
+            <p className="text-xl text-zinc-600">
               Tu asistente diario para la gestión de pólizas de seguros
             </p>
           </div>
 
           {/* Features */}
           <div className="grid md:grid-cols-3 gap-8 my-16">
-            <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="bg-white rounded-lg shadow-sm border border-zinc-200 p-6">
               <ClipboardDocumentListIcon className="w-12 h-12 text-blue-600 mb-4 mx-auto" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className="text-lg font-semibold text-zinc-900 mb-2">
                 Gestión de Pólizas
               </h3>
-              <p className="text-gray-600">
+              <p className="text-zinc-600">
                 Administra todas tus pólizas de seguros en un solo lugar
               </p>
             </div>
 
-            <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="bg-white rounded-lg shadow-sm border border-zinc-200 p-6">
               <UsersIcon className="w-12 h-12 text-blue-600 mb-4 mx-auto" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className="text-lg font-semibold text-zinc-900 mb-2">
                 Gestión de Clientes
               </h3>
-              <p className="text-gray-600">
+              <p className="text-zinc-600">
                 Mantén un registro completo de tus clientes y sus necesidades
               </p>
             </div>
 
-            <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="bg-white rounded-lg shadow-sm border border-zinc-200 p-6">
               <ChartBarIcon className="w-12 h-12 text-blue-600 mb-4 mx-auto" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className="text-lg font-semibold text-zinc-900 mb-2">
                 Reportes y Análisis
               </h3>
-              <p className="text-gray-600">
+              <p className="text-zinc-600">
                 Obtén insights valiosos sobre tu cartera de seguros
               </p>
             </div>
@@ -93,7 +94,7 @@ export default function Home() {
           </div>
 
           {/* Additional Info */}
-          <div className="mt-16 text-gray-600">
+          <div className="mt-16 text-zinc-600">
             <p className="text-sm">
               PolizaLab CRM - Sistema de gestión para agentes de seguros
             </p>
