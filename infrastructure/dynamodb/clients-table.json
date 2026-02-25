@@ -1,0 +1,126 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "PolizaLab CRM — Clients DynamoDB table with GSIs for multi-attribute lookups. Composite primary key: tenantId (PK) + clientId (SK) mirrors the Policies table pattern.",
+
+  "Parameters": {
+    "Environment": {
+      "Type": "String",
+      "Default": "dev",
+      "AllowedValues": ["dev", "stage", "prod"],
+      "Description": "Deployment environment"
+    }
+  },
+
+  "Resources": {
+    "ClientsTable": {
+      "Type": "AWS::DynamoDB::Table",
+
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+
+      "Properties": {
+        "TableName": {
+          "Fn::Sub": "Clients-${Environment}"
+        },
+
+        "BillingMode": "PAY_PER_REQUEST",
+
+        "AttributeDefinitions": [
+          { "AttributeName": "tenantId",   "AttributeType": "S" },
+          { "AttributeName": "clientId",   "AttributeType": "S" },
+          { "AttributeName": "email",      "AttributeType": "S" },
+          { "AttributeName": "rfc",        "AttributeType": "S" },
+          { "AttributeName": "phone",      "AttributeType": "S" },
+          { "AttributeName": "userId",     "AttributeType": "S" },
+          { "AttributeName": "createdAt",  "AttributeType": "S" }
+        ],
+
+        "KeySchema": [
+          { "AttributeName": "tenantId", "KeyType": "HASH" },
+          { "AttributeName": "clientId", "KeyType": "RANGE" }
+        ],
+
+        "GlobalSecondaryIndexes": [
+          {
+            "IndexName": "email-index",
+            "KeySchema": [
+              { "AttributeName": "tenantId", "KeyType": "HASH" },
+              { "AttributeName": "email",    "KeyType": "RANGE" }
+            ],
+            "Projection": {
+              "ProjectionType": "INCLUDE",
+              "NonKeyAttributes": ["clientId", "userId", "firstName", "lastName", "status"]
+            }
+          },
+
+          {
+            "IndexName": "rfc-index",
+            "KeySchema": [
+              { "AttributeName": "tenantId", "KeyType": "HASH" },
+              { "AttributeName": "rfc",      "KeyType": "RANGE" }
+            ],
+            "Projection": {
+              "ProjectionType": "INCLUDE",
+              "NonKeyAttributes": ["clientId", "userId", "firstName", "lastName", "status"]
+            }
+          },
+
+          {
+            "IndexName": "phone-index",
+            "KeySchema": [
+              { "AttributeName": "tenantId", "KeyType": "HASH" },
+              { "AttributeName": "phone",    "KeyType": "RANGE" }
+            ],
+            "Projection": {
+              "ProjectionType": "INCLUDE",
+              "NonKeyAttributes": ["clientId", "userId", "firstName", "lastName", "status"]
+            }
+          },
+
+          {
+            "IndexName": "userId-createdAt-index",
+            "KeySchema": [
+              { "AttributeName": "userId",    "KeyType": "HASH" },
+              { "AttributeName": "createdAt", "KeyType": "RANGE" }
+            ],
+            "Projection": {
+              "ProjectionType": "ALL"
+            }
+          }
+        ],
+
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+
+        "SSESpecification": {
+          "SSEEnabled": true
+        },
+
+        "Tags": [
+          { "Key": "Project",     "Value": "PolizaLab" },
+          { "Key": "Feature",     "Value": "Clients" },
+          { "Key": "Environment", "Value": { "Ref": "Environment" } },
+          { "Key": "ManagedBy",   "Value": "CloudFormation" }
+        ]
+      }
+    }
+  },
+
+  "Outputs": {
+    "TableName": {
+      "Description": "Name of the Clients DynamoDB table",
+      "Value": { "Ref": "ClientsTable" },
+      "Export": {
+        "Name": { "Fn::Sub": "PolizaLab-ClientsTableName-${Environment}" }
+      }
+    },
+    "TableArn": {
+      "Description": "ARN of the Clients DynamoDB table",
+      "Value": { "Fn::GetAtt": ["ClientsTable", "Arn"] },
+      "Export": {
+        "Name": { "Fn::Sub": "PolizaLab-ClientsTableArn-${Environment}" }
+      }
+    }
+  }
+}

@@ -32,7 +32,7 @@ interface NavItem {
 
 const mainNav: NavItem[] = [
   { label: 'Pólizas', href: '/policies', icon: ClipboardDocumentListIcon },
-  { label: 'Clientes', href: '/clients', icon: UsersIcon, disabled: true },
+  { label: 'Clientes', href: '/clients', icon: UsersIcon },
   { label: 'Reportes', href: '/reports', icon: ChartBarIcon, disabled: true },
 ];
 

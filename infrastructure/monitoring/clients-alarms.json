@@ -1,0 +1,197 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "PolizaLab CRM — CloudWatch alarms and dashboard for the Clients Lambda service and supporting DynamoDB table.",
+
+  "Parameters": {
+    "Environment": {
+      "Type": "String",
+      "Default": "dev",
+      "AllowedValues": ["dev", "stage", "prod"],
+      "Description": "Deployment environment"
+    },
+    "AlarmSnsTopicArn": {
+      "Type": "String",
+      "Default": "",
+      "Description": "SNS topic ARN for alarm notifications (optional — leave blank to skip notifications)"
+    }
+  },
+
+  "Conditions": {
+    "HasSnsTopic": {
+      "Fn::Not": [{ "Fn::Equals": [{ "Ref": "AlarmSnsTopicArn" }, ""] }]
+    }
+  },
+
+  "Resources": {
+
+    "AlarmLambdaErrors": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmName": {
+          "Fn::Sub": "polizalab-client-handler-${Environment}-errors"
+        },
+        "AlarmDescription": "client-handler Lambda error count exceeded 5 in a 5-minute window. Investigate CloudWatch Logs at /aws/lambda/polizalab-client-handler-${Environment}.",
+        "Namespace": "AWS/Lambda",
+        "MetricName": "Errors",
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": { "Fn::Sub": "polizalab-client-handler-${Environment}" }
+          }
+        ],
+        "Statistic": "Sum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 5,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": {
+          "Fn::If": [
+            "HasSnsTopic",
+            [{ "Ref": "AlarmSnsTopicArn" }],
+            []
+          ]
+        },
+        "OKActions": {
+          "Fn::If": [
+            "HasSnsTopic",
+            [{ "Ref": "AlarmSnsTopicArn" }],
+            []
+          ]
+        }
+      }
+    },
+
+    "AlarmLambdaP99Latency": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmName": {
+          "Fn::Sub": "polizalab-client-handler-${Environment}-latency-p99"
+        },
+        "AlarmDescription": "client-handler Lambda P99 duration exceeded 3000ms. Check for DynamoDB hot partitions, cold-start issues, or network latency.",
+        "Namespace": "AWS/Lambda",
+        "MetricName": "Duration",
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": { "Fn::Sub": "polizalab-client-handler-${Environment}" }
+          }
+        ],
+        "ExtendedStatistic": "p99",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 3000,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": {
+          "Fn::If": [
+            "HasSnsTopic",
+            [{ "Ref": "AlarmSnsTopicArn" }],
+            []
+          ]
+        },
+        "OKActions": {
+          "Fn::If": [
+            "HasSnsTopic",
+            [{ "Ref": "AlarmSnsTopicArn" }],
+            []
+          ]
+        }
+      }
+    },
+
+    "AlarmDynamoDBThrottled": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmName": {
+          "Fn::Sub": "polizalab-clients-table-${Environment}-throttled-requests"
+        },
+        "AlarmDescription": "Clients DynamoDB table has throttled requests. Even with PAY_PER_REQUEST, bursts above provisioned capacity can throttle briefly. Investigate query patterns or GSI hot keys.",
+        "Namespace": "AWS/DynamoDB",
+        "MetricName": "ThrottledRequests",
+        "Dimensions": [
+          {
+            "Name": "TableName",
+            "Value": { "Fn::Sub": "Clients-${Environment}" }
+          }
+        ],
+        "Statistic": "Sum",
+        "Period": 60,
+        "EvaluationPeriods": 1,
+        "Threshold": 0,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": {
+          "Fn::If": [
+            "HasSnsTopic",
+            [{ "Ref": "AlarmSnsTopicArn" }],
+            []
+          ]
+        }
+      }
+    },
+
+    "AlarmLambdaConcurrency": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmName": {
+          "Fn::Sub": "polizalab-client-handler-${Environment}-concurrency"
+        },
+        "AlarmDescription": "client-handler Lambda concurrent executions approaching the reserved limit of 50. If throttling begins, clients will receive 429 errors.",
+        "Namespace": "AWS/Lambda",
+        "MetricName": "ConcurrentExecutions",
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": { "Fn::Sub": "polizalab-client-handler-${Environment}" }
+          }
+        ],
+        "Statistic": "Maximum",
+        "Period": 60,
+        "EvaluationPeriods": 3,
+        "Threshold": 40,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": {
+          "Fn::If": [
+            "HasSnsTopic",
+            [{ "Ref": "AlarmSnsTopicArn" }],
+            []
+          ]
+        }
+      }
+    },
+
+    "ClientsServiceDashboard": {
+      "Type": "AWS::CloudWatch::Dashboard",
+      "Properties": {
+        "DashboardName": {
+          "Fn::Sub": "PolizaLab-Clients-${Environment}"
+        },
+        "DashboardBody": {
+          "Fn::Sub": "{\"widgets\":[{\"type\":\"metric\",\"x\":0,\"y\":0,\"width\":12,\"height\":6,\"properties\":{\"title\":\"Lambda Invocations & Errors\",\"view\":\"timeSeries\",\"stacked\":false,\"metrics\":[[\"AWS/Lambda\",\"Invocations\",\"FunctionName\",\"polizalab-client-handler-${Environment}\",{\"label\":\"Invocations\",\"color\":\"#2ca02c\"}],[\"AWS/Lambda\",\"Errors\",\"FunctionName\",\"polizalab-client-handler-${Environment}\",{\"label\":\"Errors\",\"color\":\"#d62728\"}],[\"AWS/Lambda\",\"Throttles\",\"FunctionName\",\"polizalab-client-handler-${Environment}\",{\"label\":\"Throttles\",\"color\":\"#ff7f0e\"}]],\"period\":60,\"stat\":\"Sum\",\"region\":\"${AWS::Region}\"}},{\"type\":\"metric\",\"x\":12,\"y\":0,\"width\":12,\"height\":6,\"properties\":{\"title\":\"Lambda Duration (ms)\",\"view\":\"timeSeries\",\"metrics\":[[\"AWS/Lambda\",\"Duration\",\"FunctionName\",\"polizalab-client-handler-${Environment}\",{\"stat\":\"Average\",\"label\":\"Avg\"}],[\"AWS/Lambda\",\"Duration\",\"FunctionName\",\"polizalab-client-handler-${Environment}\",{\"stat\":\"p99\",\"label\":\"P99\"}],[\"AWS/Lambda\",\"Duration\",\"FunctionName\",\"polizalab-client-handler-${Environment}\",{\"stat\":\"Maximum\",\"label\":\"Max\"}]],\"period\":60,\"region\":\"${AWS::Region}\",\"yAxis\":{\"left\":{\"min\":0}}}},{\"type\":\"metric\",\"x\":0,\"y\":6,\"width\":12,\"height\":6,\"properties\":{\"title\":\"DynamoDB Clients Table — Read/Write\",\"view\":\"timeSeries\",\"metrics\":[[\"AWS/DynamoDB\",\"ConsumedReadCapacityUnits\",\"TableName\",\"Clients-${Environment}\",{\"label\":\"Read CU\",\"stat\":\"Sum\"}],[\"AWS/DynamoDB\",\"ConsumedWriteCapacityUnits\",\"TableName\",\"Clients-${Environment}\",{\"label\":\"Write CU\",\"stat\":\"Sum\"}]],\"period\":60,\"region\":\"${AWS::Region}\"}},{\"type\":\"metric\",\"x\":12,\"y\":6,\"width\":12,\"height\":6,\"properties\":{\"title\":\"DynamoDB Clients Table — Throttles & Errors\",\"view\":\"timeSeries\",\"metrics\":[[\"AWS/DynamoDB\",\"ThrottledRequests\",\"TableName\",\"Clients-${Environment}\",{\"label\":\"Throttles\",\"stat\":\"Sum\",\"color\":\"#ff7f0e\"}],[\"AWS/DynamoDB\",\"SystemErrors\",\"TableName\",\"Clients-${Environment}\",{\"label\":\"System Errors\",\"stat\":\"Sum\",\"color\":\"#d62728\"}]],\"period\":60,\"region\":\"${AWS::Region}\"}},{\"type\":\"alarm\",\"x\":0,\"y\":12,\"width\":24,\"height\":4,\"properties\":{\"title\":\"Clients Service Alarms\",\"alarms\":[\"arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:polizalab-client-handler-${Environment}-errors\",\"arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:polizalab-client-handler-${Environment}-latency-p99\",\"arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:polizalab-clients-table-${Environment}-throttled-requests\",\"arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:polizalab-client-handler-${Environment}-concurrency\"]}}]}"
+        }
+      }
+    }
+
+  },
+
+  "Outputs": {
+    "ErrorAlarmArn": {
+      "Description": "ARN of the Lambda errors alarm",
+      "Value": { "Fn::GetAtt": ["AlarmLambdaErrors", "Arn"] }
+    },
+    "LatencyAlarmArn": {
+      "Description": "ARN of the Lambda P99 latency alarm",
+      "Value": { "Fn::GetAtt": ["AlarmLambdaP99Latency", "Arn"] }
+    },
+    "ThrottleAlarmArn": {
+      "Description": "ARN of the DynamoDB throttled-requests alarm",
+      "Value": { "Fn::GetAtt": ["AlarmDynamoDBThrottled", "Arn"] }
+    },
+    "DashboardName": {
+      "Description": "CloudWatch dashboard for the Clients service",
+      "Value": { "Ref": "ClientsServiceDashboard" }
+    }
+  }
+}

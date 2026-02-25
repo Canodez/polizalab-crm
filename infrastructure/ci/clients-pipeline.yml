@@ -1,0 +1,566 @@
+# =============================================================================
+# GitHub Actions — client-handler Lambda CI/CD pipeline
+#
+# Triggers on any push touching lambda/client-handler/** or the pipeline file
+# itself.  Automatically deploys to dev; stage and prod require manual approval
+# via GitHub Environments with required reviewers.
+#
+# Required repository secrets:
+#   AWS_ROLE_ARN_DEV    — IAM role ARN with deploy permissions (dev account)
+#   AWS_ROLE_ARN_STAGE  — IAM role ARN with deploy permissions (stage account)
+#   AWS_ROLE_ARN_PROD   — IAM role ARN with deploy permissions (prod account)
+#
+# Required repository variables (Settings > Variables):
+#   AWS_REGION          — default: us-east-1
+#   API_GATEWAY_ID      — f34orvshp5
+#
+# Requires GitHub Environments named:
+#   dev, stage, prod   (prod should have required reviewers configured)
+# =============================================================================
+
+name: client-handler Lambda CI/CD
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    paths:
+      - "lambda/client-handler/**"
+      - "infrastructure/ci/clients-pipeline.yml"
+  pull_request:
+    branches:
+      - master
+      - main
+    paths:
+      - "lambda/client-handler/**"
+
+permissions:
+  id-token: write   # needed for OIDC authentication with AWS
+  contents: read
+
+env:
+  AWS_REGION:       ${{ vars.AWS_REGION || 'us-east-1' }}
+  API_GATEWAY_ID:   ${{ vars.API_GATEWAY_ID || 'f34orvshp5' }}
+  PYTHON_VERSION:   "3.12"
+  LAMBDA_SRC:       "lambda/client-handler"
+  FUNCTION_BASE:    "polizalab-client-handler"
+
+# ---------------------------------------------------------------------------
+# Jobs
+# ---------------------------------------------------------------------------
+jobs:
+
+  # ── 1. Lint ──────────────────────────────────────────────────────────────
+  lint:
+    name: Lint (ruff + flake8)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install linting tools
+        run: pip install ruff flake8
+
+      - name: Run ruff (fast linter + formatter check)
+        run: |
+          ruff check ${{ env.LAMBDA_SRC }}/
+          ruff format --check ${{ env.LAMBDA_SRC }}/
+
+      - name: Run flake8 (style guide enforcement)
+        run: |
+          flake8 ${{ env.LAMBDA_SRC }}/ \
+            --max-line-length=120 \
+            --extend-ignore=E203,W503 \
+            --exclude=__pycache__,tests
+
+  # ── 2. Test ──────────────────────────────────────────────────────────────
+  test:
+    name: Test (pytest + coverage)
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install test dependencies
+        working-directory: ${{ env.LAMBDA_SRC }}
+        run: |
+          pip install pytest pytest-cov pytest-mock moto[dynamodb] boto3
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run pytest with coverage
+        working-directory: ${{ env.LAMBDA_SRC }}
+        run: |
+          pytest tests/ \
+            --cov=. \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --cov-fail-under=80 \
+            -v
+
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          file: ${{ env.LAMBDA_SRC }}/coverage.xml
+          flags: client-handler
+          fail_ci_if_error: false
+
+  # ── 3. Package ───────────────────────────────────────────────────────────
+  package:
+    name: Package Lambda zip
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push'
+
+    outputs:
+      artifact-name: ${{ steps.set-artifact-name.outputs.name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Set artifact name
+        id: set-artifact-name
+        run: |
+          SHORT_SHA="${GITHUB_SHA::8}"
+          echo "name=client-handler-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Install production dependencies
+        working-directory: ${{ env.LAMBDA_SRC }}
+        run: |
+          mkdir -p dist
+          if [ -f requirements.txt ]; then
+            pip install \
+              --quiet \
+              --target dist/ \
+              --platform manylinux2014_x86_64 \
+              --implementation cp \
+              --python-version ${{ env.PYTHON_VERSION }} \
+              --only-binary=:all: \
+              -r requirements.txt
+          fi
+
+      - name: Build zip
+        working-directory: ${{ env.LAMBDA_SRC }}
+        run: |
+          # Copy source (exclude tests and build artifacts)
+          rsync -a \
+            --exclude '__pycache__' \
+            --exclude '*.pyc' \
+            --exclude 'tests/' \
+            --exclude 'dist/' \
+            --exclude '.pytest_cache/' \
+            --exclude 'coverage.xml' \
+            . dist/
+          (cd dist && zip -q -r ../client-handler.zip .)
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.set-artifact-name.outputs.name }}
+          path: ${{ env.LAMBDA_SRC }}/client-handler.zip
+          retention-days: 7
+          if-no-files-found: error
+
+  # ── 4. Deploy to dev ─────────────────────────────────────────────────────
+  deploy-dev:
+    name: Deploy to dev
+    runs-on: ubuntu-latest
+    needs: package
+    if: github.event_name == 'push'
+    environment: dev
+
+    env:
+      DEPLOY_ENV: dev
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Lambda artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.package.outputs.artifact-name }}
+          path: dist/
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_DEV }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-ClientHandler-Dev
+
+      - name: Deploy DynamoDB table (CloudFormation)
+        run: |
+          aws cloudformation deploy \
+            --stack-name polizalab-clients-table-dev \
+            --template-file infrastructure/dynamodb/clients-table.json \
+            --parameter-overrides Environment=dev \
+            --region ${{ env.AWS_REGION }} \
+            --tags Project=PolizaLab Feature=Clients Environment=dev \
+            --no-fail-on-empty-changeset
+
+      - name: Deploy IAM role (CloudFormation)
+        run: |
+          aws cloudformation deploy \
+            --stack-name polizalab-client-handler-role-dev \
+            --template-file infrastructure/iam/client-handler-policy.json \
+            --parameter-overrides Environment=dev \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region ${{ env.AWS_REGION }} \
+            --tags Project=PolizaLab Feature=Clients Environment=dev \
+            --no-fail-on-empty-changeset
+
+      - name: Ensure artifacts bucket exists
+        run: |
+          BUCKET="polizalab-lambda-artifacts-dev"
+          if ! aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+            aws s3api create-bucket \
+              --bucket "$BUCKET" \
+              --region ${{ env.AWS_REGION }}
+            aws s3api put-bucket-versioning \
+              --bucket "$BUCKET" \
+              --versioning-configuration Status=Enabled
+            aws s3api put-public-access-block \
+              --bucket "$BUCKET" \
+              --public-access-block-configuration \
+                BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+          fi
+
+      - name: Upload Lambda zip to S3
+        run: |
+          S3_KEY="client-handler/polizalab-client-handler-dev-${GITHUB_SHA::8}.zip"
+          aws s3 cp dist/client-handler.zip \
+            "s3://polizalab-lambda-artifacts-dev/${S3_KEY}" \
+            --region ${{ env.AWS_REGION }}
+          echo "S3_KEY=${S3_KEY}" >> "$GITHUB_ENV"
+
+      - name: Update Lambda function code
+        run: |
+          FUNCTION_NAME="${{ env.FUNCTION_BASE }}-dev"
+          # Check if function exists
+          if aws lambda get-function --function-name "$FUNCTION_NAME" --region ${{ env.AWS_REGION }} 2>/dev/null; then
+            aws lambda update-function-code \
+              --function-name "$FUNCTION_NAME" \
+              --s3-bucket polizalab-lambda-artifacts-dev \
+              --s3-key "$S3_KEY" \
+              --region ${{ env.AWS_REGION }} \
+              --output text > /dev/null
+            aws lambda wait function-updated \
+              --function-name "$FUNCTION_NAME" \
+              --region ${{ env.AWS_REGION }}
+            echo "Lambda code updated: $FUNCTION_NAME"
+          else
+            echo "Lambda function $FUNCTION_NAME does not exist — run deploy-clients.sh first to create it."
+            exit 1
+          fi
+
+      - name: Publish Lambda version and update alias
+        id: publish
+        run: |
+          FUNCTION_NAME="${{ env.FUNCTION_BASE }}-dev"
+          VERSION=$(aws lambda publish-version \
+            --function-name "$FUNCTION_NAME" \
+            --description "SHA ${GITHUB_SHA::8} deployed by GitHub Actions" \
+            --region ${{ env.AWS_REGION }} \
+            --query "Version" \
+            --output text)
+          echo "Published version: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          # Upsert 'live' alias pointing to the new version
+          if aws lambda get-alias \
+               --function-name "$FUNCTION_NAME" \
+               --name live \
+               --region ${{ env.AWS_REGION }} 2>/dev/null; then
+            aws lambda update-alias \
+              --function-name "$FUNCTION_NAME" \
+              --name live \
+              --function-version "$VERSION" \
+              --region ${{ env.AWS_REGION }} \
+              --output text > /dev/null
+          else
+            aws lambda create-alias \
+              --function-name "$FUNCTION_NAME" \
+              --name live \
+              --function-version "$VERSION" \
+              --region ${{ env.AWS_REGION }} \
+              --output text > /dev/null
+          fi
+          echo "Alias 'live' -> version $VERSION"
+
+      - name: Deploy CloudWatch monitoring (CloudFormation)
+        run: |
+          aws cloudformation deploy \
+            --stack-name polizalab-clients-monitoring-dev \
+            --template-file infrastructure/monitoring/clients-alarms.json \
+            --parameter-overrides Environment=dev \
+            --region ${{ env.AWS_REGION }} \
+            --tags Project=PolizaLab Feature=Clients Environment=dev \
+            --no-fail-on-empty-changeset
+
+      - name: Smoke test (GET /clients returns non-500)
+        run: |
+          API_URL="https://${{ env.API_GATEWAY_ID }}.execute-api.${{ env.AWS_REGION }}.amazonaws.com/clients"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer invalid-for-smoke-test" \
+            "$API_URL")
+          echo "Smoke test status: $STATUS"
+          # 401/403 means the route exists and the authorizer is working
+          if [[ "$STATUS" == "500" || "$STATUS" == "000" ]]; then
+            echo "FAIL: Unexpected status $STATUS — Lambda may have crashed on startup"
+            exit 1
+          fi
+          echo "Smoke test passed (status $STATUS is acceptable)"
+
+  # ── 5. Deploy to stage ───────────────────────────────────────────────────
+  deploy-stage:
+    name: Deploy to stage
+    runs-on: ubuntu-latest
+    needs: deploy-dev
+    environment: stage
+
+    env:
+      DEPLOY_ENV: stage
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Lambda artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.package.outputs.artifact-name }}
+          path: dist/
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_STAGE }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-ClientHandler-Stage
+
+      - name: Deploy DynamoDB table (CloudFormation)
+        run: |
+          aws cloudformation deploy \
+            --stack-name polizalab-clients-table-stage \
+            --template-file infrastructure/dynamodb/clients-table.json \
+            --parameter-overrides Environment=stage \
+            --region ${{ env.AWS_REGION }} \
+            --tags Project=PolizaLab Feature=Clients Environment=stage \
+            --no-fail-on-empty-changeset
+
+      - name: Deploy IAM role (CloudFormation)
+        run: |
+          aws cloudformation deploy \
+            --stack-name polizalab-client-handler-role-stage \
+            --template-file infrastructure/iam/client-handler-policy.json \
+            --parameter-overrides Environment=stage \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region ${{ env.AWS_REGION }} \
+            --tags Project=PolizaLab Feature=Clients Environment=stage \
+            --no-fail-on-empty-changeset
+
+      - name: Ensure artifacts bucket exists
+        run: |
+          BUCKET="polizalab-lambda-artifacts-stage"
+          if ! aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+            aws s3api create-bucket \
+              --bucket "$BUCKET" \
+              --region ${{ env.AWS_REGION }}
+            aws s3api put-bucket-versioning \
+              --bucket "$BUCKET" \
+              --versioning-configuration Status=Enabled
+            aws s3api put-public-access-block \
+              --bucket "$BUCKET" \
+              --public-access-block-configuration \
+                BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+          fi
+
+      - name: Upload Lambda zip to S3
+        run: |
+          S3_KEY="client-handler/polizalab-client-handler-stage-${GITHUB_SHA::8}.zip"
+          aws s3 cp dist/client-handler.zip \
+            "s3://polizalab-lambda-artifacts-stage/${S3_KEY}" \
+            --region ${{ env.AWS_REGION }}
+          echo "S3_KEY=${S3_KEY}" >> "$GITHUB_ENV"
+
+      - name: Update Lambda function code and publish version
+        run: |
+          FUNCTION_NAME="${{ env.FUNCTION_BASE }}-stage"
+          aws lambda update-function-code \
+            --function-name "$FUNCTION_NAME" \
+            --s3-bucket polizalab-lambda-artifacts-stage \
+            --s3-key "$S3_KEY" \
+            --region ${{ env.AWS_REGION }} \
+            --output text > /dev/null
+          aws lambda wait function-updated \
+            --function-name "$FUNCTION_NAME" \
+            --region ${{ env.AWS_REGION }}
+
+          VERSION=$(aws lambda publish-version \
+            --function-name "$FUNCTION_NAME" \
+            --description "SHA ${GITHUB_SHA::8} deployed by GitHub Actions" \
+            --region ${{ env.AWS_REGION }} \
+            --query "Version" \
+            --output text)
+          echo "Published version: $VERSION"
+
+          if aws lambda get-alias --function-name "$FUNCTION_NAME" --name live --region ${{ env.AWS_REGION }} 2>/dev/null; then
+            aws lambda update-alias --function-name "$FUNCTION_NAME" --name live --function-version "$VERSION" \
+              --region ${{ env.AWS_REGION }} --output text > /dev/null
+          else
+            aws lambda create-alias --function-name "$FUNCTION_NAME" --name live --function-version "$VERSION" \
+              --region ${{ env.AWS_REGION }} --output text > /dev/null
+          fi
+
+      - name: Deploy CloudWatch monitoring (CloudFormation)
+        run: |
+          aws cloudformation deploy \
+            --stack-name polizalab-clients-monitoring-stage \
+            --template-file infrastructure/monitoring/clients-alarms.json \
+            --parameter-overrides Environment=stage \
+            --region ${{ env.AWS_REGION }} \
+            --tags Project=PolizaLab Feature=Clients Environment=stage \
+            --no-fail-on-empty-changeset
+
+  # ── 6. Deploy to prod ────────────────────────────────────────────────────
+  deploy-prod:
+    name: Deploy to prod
+    runs-on: ubuntu-latest
+    needs: deploy-stage
+    environment: prod   # requires manual approval in GitHub Environments
+
+    env:
+      DEPLOY_ENV: prod
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Lambda artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.package.outputs.artifact-name }}
+          path: dist/
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-ClientHandler-Prod
+
+      - name: Deploy DynamoDB table (CloudFormation)
+        run: |
+          aws cloudformation deploy \
+            --stack-name polizalab-clients-table-prod \
+            --template-file infrastructure/dynamodb/clients-table.json \
+            --parameter-overrides Environment=prod \
+            --region ${{ env.AWS_REGION }} \
+            --tags Project=PolizaLab Feature=Clients Environment=prod \
+            --no-fail-on-empty-changeset
+
+      - name: Deploy IAM role (CloudFormation)
+        run: |
+          aws cloudformation deploy \
+            --stack-name polizalab-clients-table-prod \
+            --template-file infrastructure/iam/client-handler-policy.json \
+            --parameter-overrides Environment=prod \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region ${{ env.AWS_REGION }} \
+            --tags Project=PolizaLab Feature=Clients Environment=prod \
+            --no-fail-on-empty-changeset
+
+      - name: Ensure artifacts bucket exists
+        run: |
+          BUCKET="polizalab-lambda-artifacts-prod"
+          if ! aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+            aws s3api create-bucket \
+              --bucket "$BUCKET" \
+              --region ${{ env.AWS_REGION }}
+            aws s3api put-bucket-versioning \
+              --bucket "$BUCKET" \
+              --versioning-configuration Status=Enabled
+            aws s3api put-public-access-block \
+              --bucket "$BUCKET" \
+              --public-access-block-configuration \
+                BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+          fi
+
+      - name: Upload Lambda zip to S3
+        run: |
+          S3_KEY="client-handler/polizalab-client-handler-prod-${GITHUB_SHA::8}.zip"
+          aws s3 cp dist/client-handler.zip \
+            "s3://polizalab-lambda-artifacts-prod/${S3_KEY}" \
+            --region ${{ env.AWS_REGION }}
+          echo "S3_KEY=${S3_KEY}" >> "$GITHUB_ENV"
+
+      - name: Update Lambda function code and publish version
+        run: |
+          FUNCTION_NAME="${{ env.FUNCTION_BASE }}-prod"
+          aws lambda update-function-code \
+            --function-name "$FUNCTION_NAME" \
+            --s3-bucket polizalab-lambda-artifacts-prod \
+            --s3-key "$S3_KEY" \
+            --region ${{ env.AWS_REGION }} \
+            --output text > /dev/null
+          aws lambda wait function-updated \
+            --function-name "$FUNCTION_NAME" \
+            --region ${{ env.AWS_REGION }}
+
+          VERSION=$(aws lambda publish-version \
+            --function-name "$FUNCTION_NAME" \
+            --description "SHA ${GITHUB_SHA::8} deployed by GitHub Actions" \
+            --region ${{ env.AWS_REGION }} \
+            --query "Version" \
+            --output text)
+          echo "Published version: $VERSION"
+
+          if aws lambda get-alias --function-name "$FUNCTION_NAME" --name live --region ${{ env.AWS_REGION }} 2>/dev/null; then
+            aws lambda update-alias --function-name "$FUNCTION_NAME" --name live --function-version "$VERSION" \
+              --region ${{ env.AWS_REGION }} --output text > /dev/null
+          else
+            aws lambda create-alias --function-name "$FUNCTION_NAME" --name live --function-version "$VERSION" \
+              --region ${{ env.AWS_REGION }} --output text > /dev/null
+          fi
+
+      - name: Deploy CloudWatch monitoring (CloudFormation)
+        run: |
+          aws cloudformation deploy \
+            --stack-name polizalab-clients-monitoring-prod \
+            --template-file infrastructure/monitoring/clients-alarms.json \
+            --parameter-overrides Environment=prod \
+            --region ${{ env.AWS_REGION }} \
+            --tags Project=PolizaLab Feature=Clients Environment=prod \
+            --no-fail-on-empty-changeset
+
+      - name: Tag release
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          TAG="client-handler-prod-$(date -u +%Y%m%d-%H%M%S)"
+          git tag -a "$TAG" -m "Production deployment of client-handler SHA ${GITHUB_SHA::8}"
+          git push origin "$TAG"

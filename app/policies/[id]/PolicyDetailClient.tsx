@@ -2,14 +2,18 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter, usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { policiesApi, Policy, PatchPolicyData, ApiError, PolicyStatus } from '@/lib/api/policiesApi';
+import { Client } from '@/lib/api/clientsApi';
 import { POLICY_TYPES, POLICY_TYPE_VALUES, getPolicyTypeConfig } from '@/lib/constants/policyTypes';
 import { useDirtyFormGuard } from '@/lib/hooks/useDirtyFormGuard';
+import { showSuccess } from '@/lib/toast';
 import AccountCard from '@/components/account/AccountCard';
 import RenewalBadge from '@/components/policies/RenewalBadge';
 import ReviewPanel from './ReviewPanel';
+import LinkClientModal from './LinkClientModal';
 
 const POLL_INTERVAL_MS = 3000;
 const POLL_MAX_MS = 5 * 60 * 1000; // 5 minutes
@@ -53,6 +57,8 @@ export default function PolicyDetailClient() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [showLinkClientModal, setShowLinkClientModal] = useState(false);
+  const [linkedClient, setLinkedClient] = useState<Client | null>(null);
 
   // Edit form fields
   const [policyNumber, setPolicyNumber] = useState('');
@@ -395,6 +401,19 @@ export default function PolicyDetailClient() {
         </div>
       )}
 
+      {/* ── LINK CLIENT MODAL ─────────────────────────────────────────────── */}
+      {showLinkClientModal && (
+        <LinkClientModal
+          policy={policy}
+          onClose={() => setShowLinkClientModal(false)}
+          onLinked={(client) => {
+            setLinkedClient(client);
+            setShowLinkClientModal(false);
+            showSuccess(`Cliente ${client.firstName} ${client.lastName} vinculado exitosamente`);
+          }}
+        />
+      )}
+
       {/* ── EXTRACTED / VERIFIED ──────────────────────────────────────────── */}
       {(policy.status === 'EXTRACTED' || policy.status === 'VERIFIED') && (
         <>
@@ -405,6 +424,34 @@ export default function PolicyDetailClient() {
               {policy.verifiedAt && (
                 <span className="text-green-600">· {formatDate(policy.verifiedAt)}</span>
               )}
+            </div>
+          )}
+
+          {/* Linked client card or Vincular button */}
+          {linkedClient ? (
+            <div className="mb-4 flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+              <div className="flex items-center gap-2 text-sm text-blue-700">
+                <span className="font-medium">Cliente vinculado:</span>
+                <span>
+                  {linkedClient.firstName} {linkedClient.lastName}
+                </span>
+              </div>
+              <Link
+                href={`/clients/${linkedClient.clientId}`}
+                className="text-sm font-medium text-blue-600 hover:underline"
+              >
+                Ver cliente
+              </Link>
+            </div>
+          ) : (
+            <div className="mb-4 flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3">
+              <p className="text-sm text-zinc-500">Sin cliente vinculado</p>
+              <button
+                onClick={() => setShowLinkClientModal(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+              >
+                Vincular cliente
+              </button>
             </div>
           )}
 

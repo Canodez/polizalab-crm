@@ -1,0 +1,81 @@
+{
+  "_comment": "API Gateway HTTP API route definitions for the Clients feature. These routes are ADDED to the existing HTTP API (id: f34orvshp5). All routes require the Cognito JWT authorizer already configured on the API. The deploy-clients.sh script reads this file and calls aws apigatewayv2 create-route / create-integration for each entry.",
+
+  "apiId": "f34orvshp5",
+  "region": "us-east-1",
+  "accountId": "584876396768",
+
+  "authorizerId": "${COGNITO_AUTHORIZER_ID}",
+  "authorizationType": "JWT",
+
+  "integrationDefaults": {
+    "integrationType": "AWS_PROXY",
+    "integrationSubtype": null,
+    "payloadFormatVersion": "2.0",
+    "timeoutInMillis": 30000,
+    "description": "client-handler Lambda proxy integration"
+  },
+
+  "routes": [
+    {
+      "routeKey": "GET /clients",
+      "description": "List all clients for the authenticated tenant",
+      "operationName": "ListClients",
+      "target": "polizalab-client-handler"
+    },
+    {
+      "routeKey": "GET /clients/check-duplicate",
+      "description": "Check for duplicate client by email, RFC, or phone before creation",
+      "operationName": "CheckDuplicateClient",
+      "target": "polizalab-client-handler"
+    },
+    {
+      "routeKey": "GET /clients/{clientId}",
+      "description": "Retrieve a single client record by ID",
+      "operationName": "GetClient",
+      "target": "polizalab-client-handler"
+    },
+    {
+      "routeKey": "POST /clients",
+      "description": "Create a new client record",
+      "operationName": "CreateClient",
+      "target": "polizalab-client-handler"
+    },
+    {
+      "routeKey": "POST /clients/upsert",
+      "description": "Create or update a client record (idempotent by RFC or email)",
+      "operationName": "UpsertClient",
+      "target": "polizalab-client-handler"
+    },
+    {
+      "routeKey": "PATCH /clients/{clientId}",
+      "description": "Partially update fields on an existing client record",
+      "operationName": "UpdateClient",
+      "target": "polizalab-client-handler"
+    },
+    {
+      "routeKey": "POST /clients/{clientId}/archive",
+      "description": "Soft-delete a client by setting status=ARCHIVED",
+      "operationName": "ArchiveClient",
+      "target": "polizalab-client-handler"
+    },
+    {
+      "routeKey": "POST /clients/{clientId}/unarchive",
+      "description": "Restore an archived client by setting status=ACTIVE",
+      "operationName": "UnarchiveClient",
+      "target": "polizalab-client-handler"
+    },
+    {
+      "routeKey": "POST /clients/{clientId}/policies/{policyId}",
+      "description": "Link an existing policy to a client record",
+      "operationName": "LinkPolicyToClient",
+      "target": "polizalab-client-handler"
+    },
+    {
+      "routeKey": "DELETE /clients/{clientId}",
+      "description": "Permanently delete a client; linked policies are unlinked and set to CREATED status",
+      "operationName": "DeleteClient",
+      "target": "polizalab-client-handler"
+    }
+  ]
+}
