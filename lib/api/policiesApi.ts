@@ -47,6 +47,11 @@ export interface Policy {
   // Derived
   fechaRenovacion?: string;
   renewalStatus?: string;
+  // Renewal outcome tracking
+  renewalOutcome?: string;
+  renewalOutcomeAt?: string;
+  renewedPolicyId?: string;
+  renewalLostReason?: string;
   // Presigned (response-only, never stored)
   originalDocUrl?: string;
 }
@@ -107,8 +112,25 @@ export const policiesApi = {
     });
   },
 
-  async getRenewals(): Promise<{ policies: Policy[]; count: number }> {
-    return apiRequest<{ policies: Policy[]; count: number }>('/policies/renewals');
+  async getRenewals(window?: string): Promise<{ policies: Policy[]; count: number }> {
+    const query = new URLSearchParams();
+    if (window) query.set('window', window);
+    const qs = query.toString();
+    return apiRequest<{ policies: Policy[]; count: number }>(`/policies/renewals${qs ? `?${qs}` : ''}`);
+  },
+
+  async markRenewed(id: string, newPolicyId?: string): Promise<{ success: boolean }> {
+    return apiRequest<{ success: boolean }>(`/policies/${id}/mark-renewed`, {
+      method: 'POST',
+      body: JSON.stringify({ newPolicyId }),
+    });
+  },
+
+  async markRenewalLost(id: string, reason: string): Promise<{ success: boolean }> {
+    return apiRequest<{ success: boolean }>(`/policies/${id}/mark-renewal-lost`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
   },
 
   async deletePolicy(id: string): Promise<void> {

@@ -1,0 +1,81 @@
+{
+  "_comment": "API Gateway HTTP API route definitions for the Activities feature. These routes are ADDED to the existing HTTP API (id: f34orvshp5). All routes require the Cognito JWT authorizer already configured on the API. The deploy-activities.sh script reads this file and calls aws apigatewayv2 create-route / create-integration for each entry.",
+
+  "apiId": "f34orvshp5",
+  "region": "us-east-1",
+  "accountId": "584876396768",
+
+  "authorizerId": "${COGNITO_AUTHORIZER_ID}",
+  "authorizationType": "JWT",
+
+  "integrationDefaults": {
+    "integrationType": "AWS_PROXY",
+    "integrationSubtype": null,
+    "payloadFormatVersion": "2.0",
+    "timeoutInMillis": 30000,
+    "description": "activity-handler Lambda proxy integration"
+  },
+
+  "routes": [
+    {
+      "routeKey": "GET /activities",
+      "description": "List all activities for the authenticated tenant",
+      "operationName": "ListActivities",
+      "target": "polizalab-activity-handler"
+    },
+    {
+      "routeKey": "GET /activities/today",
+      "description": "Retrieve activities due or scheduled for today for the authenticated user",
+      "operationName": "GetTodayActivities",
+      "target": "polizalab-activity-handler"
+    },
+    {
+      "routeKey": "GET /activities/{activityId}",
+      "description": "Retrieve a single activity record by ID",
+      "operationName": "GetActivity",
+      "target": "polizalab-activity-handler"
+    },
+    {
+      "routeKey": "POST /activities",
+      "description": "Create a new activity record",
+      "operationName": "CreateActivity",
+      "target": "polizalab-activity-handler"
+    },
+    {
+      "routeKey": "PATCH /activities/{activityId}",
+      "description": "Partially update fields on an existing activity record",
+      "operationName": "UpdateActivity",
+      "target": "polizalab-activity-handler"
+    },
+    {
+      "routeKey": "POST /activities/{activityId}/complete",
+      "description": "Mark an activity as completed and record the completion timestamp",
+      "operationName": "CompleteActivity",
+      "target": "polizalab-activity-handler"
+    },
+    {
+      "routeKey": "POST /activities/{activityId}/cancel",
+      "description": "Cancel a pending or scheduled activity",
+      "operationName": "CancelActivity",
+      "target": "polizalab-activity-handler"
+    },
+    {
+      "routeKey": "POST /activities/{activityId}/reschedule",
+      "description": "Reschedule an activity to a new scheduledAt date/time",
+      "operationName": "RescheduleActivity",
+      "target": "polizalab-activity-handler"
+    },
+    {
+      "routeKey": "DELETE /activities/{activityId}",
+      "description": "Permanently delete an activity record",
+      "operationName": "DeleteActivity",
+      "target": "polizalab-activity-handler"
+    },
+    {
+      "routeKey": "GET /activities/by-entity/{entityType}/{entityId}",
+      "description": "List all activities linked to a specific entity (e.g. LEAD#uuid or CLIENT#uuid)",
+      "operationName": "GetActivitiesByEntity",
+      "target": "polizalab-activity-handler"
+    }
+  ]
+}

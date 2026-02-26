@@ -181,7 +181,7 @@ def list_policies(user_id: str) -> dict:
     return resp(200, {"policies": policies, "count": len(policies)})
 
 
-def get_renewals(user_id: str) -> dict:
+def get_renewals(user_id: str, query_params: dict = None) -> dict:
     table = get_dynamodb().Table(POLICIES_TABLE)
     result = table.query(
         IndexName="userId-createdAt-index",
@@ -189,15 +189,93 @@ def get_renewals(user_id: str) -> dict:
     )
     items = result.get("Items", [])
     eligible_statuses = {"EXTRACTED", "VERIFIED", "NEEDS_REVIEW"}
+    window = (query_params or {}).get("window", "")
+
+    # Determine which renewalStatus values are relevant for the window
+    if window == "overdue":
+        allowed_statuses = {"OVERDUE"}
+    elif window == "30":
+        allowed_statuses = {"30_DAYS"}
+    elif window == "60":
+        allowed_statuses = {"30_DAYS", "60_DAYS"}
+    elif window == "90":
+        allowed_statuses = {"30_DAYS", "60_DAYS", "90_DAYS"}
+    else:
+        allowed_statuses = {"30_DAYS", "60_DAYS", "90_DAYS", "OVERDUE"}
+
     policies = []
     for item in items:
         if item.get("status") not in eligible_statuses:
             continue
+        # Skip policies already handled (renewed or lost)
+        if item.get("renewalOutcome"):
+            continue
         item = enrich_policy(item)
-        if item.get("renewalStatus") in {"30_DAYS", "60_DAYS", "90_DAYS", "OVERDUE"}:
+        if item.get("renewalStatus") in allowed_statuses:
             policies.append(item)
     policies.sort(key=lambda p: p.get("fechaRenovacion") or "")
     return resp(200, {"policies": policies, "count": len(policies)})
+
+
+def mark_renewed(user_id: str, policy_id: str, body: dict) -> dict:
+    """Mark a policy as renewed, optionally linking to the new policy."""
+    table = get_dynamodb().Table(POLICIES_TABLE)
+    result = table.get_item(Key={"tenantId": TENANT_ID, "policyId": policy_id})
+    item = result.get("Item")
+    if not item:
+        return resp(404, {"error": "Policy not found"})
+    if item.get("userId") != user_id:
+        return resp(403, {"error": "Forbidden"})
+
+    new_policy_id = (body.get("newPolicyId") or "").strip() or None
+    now = now_iso()
+
+    update_expr = "SET renewalOutcome = :outcome, renewalOutcomeAt = :now, updatedAt = :now"
+    expr_values = {":outcome": "RENEWED", ":now": now}
+
+    if new_policy_id:
+        update_expr += ", renewedPolicyId = :newId"
+        expr_values[":newId"] = new_policy_id
+
+    table.update_item(
+        Key={"tenantId": TENANT_ID, "policyId": policy_id},
+        UpdateExpression=update_expr,
+        ExpressionAttributeValues=expr_values,
+    )
+    logger.info("Policy marked renewed: policyId=%s newPolicyId=%s", policy_id, new_policy_id)
+    return resp(200, {"success": True, "policyId": policy_id, "renewalOutcome": "RENEWED"})
+
+
+def mark_renewal_lost(user_id: str, policy_id: str, body: dict) -> dict:
+    """Mark a policy renewal as lost with a reason."""
+    table = get_dynamodb().Table(POLICIES_TABLE)
+    result = table.get_item(Key={"tenantId": TENANT_ID, "policyId": policy_id})
+    item = result.get("Item")
+    if not item:
+        return resp(404, {"error": "Policy not found"})
+    if item.get("userId") != user_id:
+        return resp(403, {"error": "Forbidden"})
+
+    reason = (body.get("reason") or "").strip()
+    if not reason:
+        return resp(400, {"error": "reason is required"})
+
+    valid_reasons = {"PRECIO", "COBERTURA", "COMPETENCIA", "SIN_RESPUESTA", "CAMBIO_PLANES", "OTRO"}
+    if reason.upper() not in valid_reasons:
+        return resp(400, {"error": f"reason must be one of: {', '.join(sorted(valid_reasons))}"})
+
+    now = now_iso()
+    table.update_item(
+        Key={"tenantId": TENANT_ID, "policyId": policy_id},
+        UpdateExpression="SET renewalOutcome = :outcome, renewalOutcomeAt = :now, renewalLostReason = :reason, updatedAt = :now",
+        ExpressionAttributeValues={
+            ":outcome": "LOST",
+            ":now": now,
+            ":reason": reason.upper(),
+        },
+    )
+    logger.info("Policy renewal marked lost: policyId=%s reason=%s", policy_id, reason)
+    return resp(200, {"success": True, "policyId": policy_id, "renewalOutcome": "LOST"})
 
 
 def get_policy(user_id: str, policy_id: str) -> dict:
@@ -437,6 +515,7 @@ def handler(event: dict, context=None) -> dict:
     )
     path = event.get("rawPath") or event.get("path", "")
     path_params = event.get("pathParameters") or {}
+    query_params = event.get("queryStringParameters") or {}
 
     try:
         body_str = event.get("body") or "{}"
@@ -447,7 +526,7 @@ def handler(event: dict, context=None) -> dict:
     try:
         # GET /policies/renewals (must be before /policies/{id})
         if method == "GET" and path == "/policies/renewals":
-            return get_renewals(user_id)
+            return get_renewals(user_id, query_params)
 
         # GET /policies
         if method == "GET" and path == "/policies":
@@ -464,6 +543,14 @@ def handler(event: dict, context=None) -> dict:
         # POST /policies/{policyId}/ingest
         if method == "POST" and path_params.get("policyId") and path.endswith("/ingest"):
             return post_ingest(user_id, path_params["policyId"])
+
+        # POST /policies/{policyId}/mark-renewed
+        if method == "POST" and path_params.get("policyId") and path.endswith("/mark-renewed"):
+            return mark_renewed(user_id, path_params["policyId"], body)
+
+        # POST /policies/{policyId}/mark-renewal-lost
+        if method == "POST" and path_params.get("policyId") and path.endswith("/mark-renewal-lost"):
+            return mark_renewal_lost(user_id, path_params["policyId"], body)
 
         # PATCH /policies/{policyId}
         if method == "PATCH" and path_params.get("policyId"):

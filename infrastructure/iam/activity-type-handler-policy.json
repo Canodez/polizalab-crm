@@ -1,0 +1,128 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "PolizaLab CRM — Least-privilege IAM role and inline policy for the activity-type-handler Lambda. Grants read access to the global ActivityTypesSystem table, full read/write access to the ActivityTypesTenant table for tenant overrides, CloudWatch Logs, and X-Ray tracing.",
+
+  "Parameters": {
+    "Environment": {
+      "Type": "String",
+      "Default": "dev",
+      "AllowedValues": ["dev", "stage", "prod"],
+      "Description": "Deployment environment"
+    }
+  },
+
+  "Resources": {
+    "ActivityTypeHandlerRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": {
+          "Fn::Sub": "polizalab-activity-type-handler-role-${Environment}"
+        },
+        "Description": "Execution role for the polizalab-activity-type-handler Lambda function",
+
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+
+        "Policies": [
+          {
+            "PolicyName": "ActivityTypeHandlerPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+
+                {
+                  "Sid": "SystemTableRead",
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:Query"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/ActivityTypesSystem-${Environment}"
+                    }
+                  ]
+                },
+
+                {
+                  "Sid": "TenantTableReadWrite",
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:DeleteItem",
+                    "dynamodb:Query"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/ActivityTypesTenant-${Environment}"
+                    }
+                  ]
+                },
+
+                {
+                  "Sid": "CloudWatchLogs",
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/polizalab-activity-type-handler-${Environment}:*"
+                  }
+                },
+
+                {
+                  "Sid": "XRayTracing",
+                  "Effect": "Allow",
+                  "Action": [
+                    "xray:PutTraceSegments",
+                    "xray:PutTelemetryRecords"
+                  ],
+                  "Resource": "*"
+                }
+
+              ]
+            }
+          }
+        ],
+
+        "Tags": [
+          { "Key": "Project",     "Value": "PolizaLab" },
+          { "Key": "Feature",     "Value": "ActivityTypes" },
+          { "Key": "Environment", "Value": { "Ref": "Environment" } },
+          { "Key": "ManagedBy",   "Value": "CloudFormation" }
+        ]
+      }
+    }
+  },
+
+  "Outputs": {
+    "RoleArn": {
+      "Description": "ARN of the activity-type-handler IAM execution role",
+      "Value": { "Fn::GetAtt": ["ActivityTypeHandlerRole", "Arn"] },
+      "Export": {
+        "Name": { "Fn::Sub": "PolizaLab-ActivityTypeHandlerRoleArn-${Environment}" }
+      }
+    },
+    "RoleName": {
+      "Description": "Name of the activity-type-handler IAM execution role",
+      "Value": { "Ref": "ActivityTypeHandlerRole" },
+      "Export": {
+        "Name": { "Fn::Sub": "PolizaLab-ActivityTypeHandlerRoleName-${Environment}" }
+      }
+    }
+  }
+}

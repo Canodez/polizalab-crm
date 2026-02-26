@@ -1,0 +1,75 @@
+{
+  "_comment": "API Gateway HTTP API route definitions for the Opportunities feature. These routes are ADDED to the existing HTTP API (id: f34orvshp5). All routes require the Cognito JWT authorizer already configured on the API. The deploy-opportunities.sh script reads this file and calls aws apigatewayv2 create-route / create-integration for each entry.",
+
+  "apiId": "f34orvshp5",
+  "region": "us-east-1",
+  "accountId": "584876396768",
+
+  "authorizerId": "${COGNITO_AUTHORIZER_ID}",
+  "authorizationType": "JWT",
+
+  "integrationDefaults": {
+    "integrationType": "AWS_PROXY",
+    "integrationSubtype": null,
+    "payloadFormatVersion": "2.0",
+    "timeoutInMillis": 30000,
+    "description": "opportunity-handler Lambda proxy integration"
+  },
+
+  "routes": [
+    {
+      "routeKey": "GET /opportunities",
+      "description": "List all opportunities for the authenticated tenant, with optional stage and product filters",
+      "operationName": "ListOpportunities",
+      "target": "polizalab-opportunity-handler"
+    },
+    {
+      "routeKey": "POST /opportunities",
+      "description": "Create a new opportunity record linked to a lead or client",
+      "operationName": "CreateOpportunity",
+      "target": "polizalab-opportunity-handler"
+    },
+    {
+      "routeKey": "GET /opportunities/{opportunityId}",
+      "description": "Retrieve a single opportunity record by ID",
+      "operationName": "GetOpportunity",
+      "target": "polizalab-opportunity-handler"
+    },
+    {
+      "routeKey": "PATCH /opportunities/{opportunityId}",
+      "description": "Partially update allowed fields on an open opportunity",
+      "operationName": "UpdateOpportunity",
+      "target": "polizalab-opportunity-handler"
+    },
+    {
+      "routeKey": "DELETE /opportunities/{opportunityId}",
+      "description": "Permanently delete an opportunity record",
+      "operationName": "DeleteOpportunity",
+      "target": "polizalab-opportunity-handler"
+    },
+    {
+      "routeKey": "POST /opportunities/{opportunityId}/advance",
+      "description": "Advance the opportunity to the next stage in the pipeline (cannot skip to GANADA or PERDIDA)",
+      "operationName": "AdvanceOpportunity",
+      "target": "polizalab-opportunity-handler"
+    },
+    {
+      "routeKey": "POST /opportunities/{opportunityId}/close-won",
+      "description": "Mark an opportunity as GANADA and set closedAt timestamp",
+      "operationName": "CloseWonOpportunity",
+      "target": "polizalab-opportunity-handler"
+    },
+    {
+      "routeKey": "POST /opportunities/{opportunityId}/close-lost",
+      "description": "Mark an opportunity as PERDIDA with a mandatory lost reason",
+      "operationName": "CloseLostOpportunity",
+      "target": "polizalab-opportunity-handler"
+    },
+    {
+      "routeKey": "POST /opportunities/{opportunityId}/quotes",
+      "description": "Append an insurer quote (premium, terms) to the opportunity quotes list",
+      "operationName": "AddQuoteToOpportunity",
+      "target": "polizalab-opportunity-handler"
+    }
+  ]
+}

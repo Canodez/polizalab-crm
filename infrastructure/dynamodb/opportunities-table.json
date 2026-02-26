@@ -1,0 +1,145 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "PolizaLab CRM — Opportunities DynamoDB table with GSIs for multi-attribute lookups. Composite primary key: tenantId (PK) + opportunityId (SK) mirrors the Leads and Clients table pattern. Sparse GSIs on leadId and clientId allow efficient reverse lookups without requiring both fields on every item.",
+
+  "Parameters": {
+    "Environment": {
+      "Type": "String",
+      "Default": "dev",
+      "AllowedValues": ["dev", "stage", "prod"],
+      "Description": "Deployment environment"
+    }
+  },
+
+  "Resources": {
+    "OpportunitiesTable": {
+      "Type": "AWS::DynamoDB::Table",
+
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+
+      "Properties": {
+        "TableName": {
+          "Fn::Sub": "Opportunities-${Environment}"
+        },
+
+        "BillingMode": "PAY_PER_REQUEST",
+
+        "AttributeDefinitions": [
+          { "AttributeName": "tenantId",       "AttributeType": "S" },
+          { "AttributeName": "opportunityId",  "AttributeType": "S" },
+          { "AttributeName": "userId",         "AttributeType": "S" },
+          { "AttributeName": "createdAt",      "AttributeType": "S" },
+          { "AttributeName": "stage",          "AttributeType": "S" },
+          { "AttributeName": "leadId",         "AttributeType": "S" },
+          { "AttributeName": "clientId",       "AttributeType": "S" }
+        ],
+
+        "KeySchema": [
+          { "AttributeName": "tenantId",      "KeyType": "HASH" },
+          { "AttributeName": "opportunityId", "KeyType": "RANGE" }
+        ],
+
+        "GlobalSecondaryIndexes": [
+          {
+            "IndexName": "userId-createdAt-index",
+            "KeySchema": [
+              { "AttributeName": "userId",    "KeyType": "HASH" },
+              { "AttributeName": "createdAt", "KeyType": "RANGE" }
+            ],
+            "Projection": {
+              "ProjectionType": "ALL"
+            }
+          },
+
+          {
+            "IndexName": "tenantId-stage-index",
+            "KeySchema": [
+              { "AttributeName": "tenantId", "KeyType": "HASH" },
+              { "AttributeName": "stage",    "KeyType": "RANGE" }
+            ],
+            "Projection": {
+              "ProjectionType": "INCLUDE",
+              "NonKeyAttributes": [
+                "opportunityId",
+                "userId",
+                "entityName",
+                "product",
+                "estimatedPremium",
+                "createdAt"
+              ]
+            }
+          },
+
+          {
+            "IndexName": "leadId-index",
+            "KeySchema": [
+              { "AttributeName": "leadId", "KeyType": "HASH" }
+            ],
+            "Projection": {
+              "ProjectionType": "INCLUDE",
+              "NonKeyAttributes": [
+                "opportunityId",
+                "tenantId",
+                "userId",
+                "stage",
+                "product",
+                "createdAt"
+              ]
+            }
+          },
+
+          {
+            "IndexName": "clientId-index",
+            "KeySchema": [
+              { "AttributeName": "clientId", "KeyType": "HASH" }
+            ],
+            "Projection": {
+              "ProjectionType": "INCLUDE",
+              "NonKeyAttributes": [
+                "opportunityId",
+                "tenantId",
+                "userId",
+                "stage",
+                "product",
+                "createdAt"
+              ]
+            }
+          }
+        ],
+
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+
+        "SSESpecification": {
+          "SSEEnabled": true
+        },
+
+        "Tags": [
+          { "Key": "Project",     "Value": "PolizaLab" },
+          { "Key": "Feature",     "Value": "Opportunities" },
+          { "Key": "Environment", "Value": { "Ref": "Environment" } },
+          { "Key": "ManagedBy",   "Value": "CloudFormation" }
+        ]
+      }
+    }
+  },
+
+  "Outputs": {
+    "TableName": {
+      "Description": "Name of the Opportunities DynamoDB table",
+      "Value": { "Ref": "OpportunitiesTable" },
+      "Export": {
+        "Name": { "Fn::Sub": "PolizaLab-OpportunitiesTableName-${Environment}" }
+      }
+    },
+    "TableArn": {
+      "Description": "ARN of the Opportunities DynamoDB table",
+      "Value": { "Fn::GetAtt": ["OpportunitiesTable", "Arn"] },
+      "Export": {
+        "Name": { "Fn::Sub": "PolizaLab-OpportunitiesTableArn-${Environment}" }
+      }
+    }
+  }
+}

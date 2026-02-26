@@ -1,0 +1,53 @@
+{
+  "_comment": "Lambda configuration for polizalab-renewal-checker. Runs daily via CloudWatch Events to create renewal reminder activities.",
+
+  "functionName": "polizalab-renewal-checker",
+  "description": "Daily scan of policies nearing expiration to auto-create renewal reminder activities.",
+
+  "runtime": "python3.12",
+  "handler": "handler.handler",
+  "memorySize": 256,
+  "timeout": 120,
+
+  "architectures": ["x86_64"],
+
+  "packageType": "Zip",
+  "codeS3Bucket": "${ARTIFACTS_BUCKET}",
+  "codeS3Key": "${ARTIFACTS_KEY}",
+
+  "environment": {
+    "Variables": {
+      "POLICIES_TABLE":   "Policies",
+      "ACTIVITIES_TABLE": "Activities",
+      "TENANT_ID":        "default",
+      "LOG_LEVEL":        "INFO"
+    }
+  },
+
+  "tracingConfig": {
+    "Mode": "Active"
+  },
+
+  "reservedConcurrentExecutions": 5,
+
+  "layers": [],
+
+  "loggingConfig": {
+    "logFormat": "JSON",
+    "applicationLogLevel": "INFO",
+    "systemLogLevel": "WARN",
+    "logGroup": "/aws/lambda/polizalab-renewal-checker"
+  },
+
+  "scheduledRule": {
+    "name": "polizalab-renewal-checker-daily",
+    "scheduleExpression": "rate(1 day)",
+    "description": "Triggers renewal checker Lambda daily"
+  },
+
+  "tags": {
+    "Project":   "PolizaLab",
+    "Feature":   "Renewals",
+    "ManagedBy": "deploy-renewals.sh"
+  }
+}

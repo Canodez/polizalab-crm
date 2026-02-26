@@ -1,0 +1,72 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "PolizaLab CRM — ActivityTypesTenant DynamoDB table. Per-tenant overrides for the activity type catalog. Allows individual tenants to customize labels, colors, and ordering without modifying the global system catalog. Composite primary key: tenantId (PK) + code (SK).",
+
+  "Parameters": {
+    "Environment": {
+      "Type": "String",
+      "Default": "dev",
+      "AllowedValues": ["dev", "stage", "prod"],
+      "Description": "Deployment environment"
+    }
+  },
+
+  "Resources": {
+    "ActivityTypesTenantTable": {
+      "Type": "AWS::DynamoDB::Table",
+
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+
+      "Properties": {
+        "TableName": {
+          "Fn::Sub": "ActivityTypesTenant-${Environment}"
+        },
+
+        "BillingMode": "PAY_PER_REQUEST",
+
+        "AttributeDefinitions": [
+          { "AttributeName": "tenantId", "AttributeType": "S" },
+          { "AttributeName": "code",     "AttributeType": "S" }
+        ],
+
+        "KeySchema": [
+          { "AttributeName": "tenantId", "KeyType": "HASH" },
+          { "AttributeName": "code",     "KeyType": "RANGE" }
+        ],
+
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+
+        "SSESpecification": {
+          "SSEEnabled": true
+        },
+
+        "Tags": [
+          { "Key": "Project",     "Value": "PolizaLab" },
+          { "Key": "Feature",     "Value": "ActivityTypes" },
+          { "Key": "Environment", "Value": { "Ref": "Environment" } },
+          { "Key": "ManagedBy",   "Value": "CloudFormation" }
+        ]
+      }
+    }
+  },
+
+  "Outputs": {
+    "TableName": {
+      "Description": "Name of the ActivityTypesTenant DynamoDB table",
+      "Value": { "Ref": "ActivityTypesTenantTable" },
+      "Export": {
+        "Name": { "Fn::Sub": "PolizaLab-ActivityTypesTenantTableName-${Environment}" }
+      }
+    },
+    "TableArn": {
+      "Description": "ARN of the ActivityTypesTenant DynamoDB table",
+      "Value": { "Fn::GetAtt": ["ActivityTypesTenantTable", "Arn"] },
+      "Export": {
+        "Name": { "Fn::Sub": "PolizaLab-ActivityTypesTenantTableArn-${Environment}" }
+      }
+    }
+  }
+}

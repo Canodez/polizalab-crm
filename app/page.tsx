@@ -17,7 +17,7 @@ export default function Home() {
   useEffect(() => {
     // Only redirect if auth is loaded and user is authenticated
     if (!isLoading && isAuthenticated) {
-      router.push('/policies');
+      router.push('/empezar-mi-dia');
     }
   }, [isLoading, isAuthenticated, router]);
 

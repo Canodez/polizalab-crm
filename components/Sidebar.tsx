@@ -5,8 +5,14 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Dialog, Transition } from '@headlessui/react';
 import {
+  SunIcon,
+  ClipboardDocumentCheckIcon,
+  CalendarIcon,
+  CurrencyDollarIcon,
+  ArrowPathIcon,
   ClipboardDocumentListIcon,
   UsersIcon,
+  UserPlusIcon,
   ChartBarIcon,
   Cog6ToothIcon,
   ArrowRightOnRectangleIcon,
@@ -31,7 +37,16 @@ interface NavItem {
 }
 
 const mainNav: NavItem[] = [
+  { label: 'Empezar mi día', href: '/empezar-mi-dia', icon: SunIcon },
+  { label: 'Pendientes', href: '/pendientes', icon: ClipboardDocumentCheckIcon },
+  { label: 'Agenda', href: '/agenda', icon: CalendarIcon },
+  { label: 'Oportunidades', href: '/oportunidades', icon: CurrencyDollarIcon },
+  { label: 'Renovaciones', href: '/renovaciones', icon: ArrowPathIcon },
+];
+
+const secondaryNav: NavItem[] = [
   { label: 'Pólizas', href: '/policies', icon: ClipboardDocumentListIcon },
+  { label: 'Leads', href: '/leads', icon: UserPlusIcon },
   { label: 'Clientes', href: '/clients', icon: UsersIcon },
   { label: 'Reportes', href: '/reports', icon: ChartBarIcon, disabled: true },
 ];
@@ -131,9 +146,26 @@ function SidebarContent({
       </div>
 
       {/* Main nav */}
-      <nav className="flex-1 px-3 py-4">
+      <nav className="flex-1 overflow-y-auto px-3 py-4">
         <ul className="space-y-1">
           {mainNav.map((item) => (
+            <li key={item.href}>
+              <NavLink
+                item={item}
+                collapsed={collapsed}
+                active={isActivePath(pathname, item.href)}
+                onNavigate={onNavigate}
+              />
+            </li>
+          ))}
+        </ul>
+
+        {/* Separator */}
+        <div className={`my-3 border-t border-zinc-200 ${collapsed ? 'mx-1' : 'mx-0'}`} />
+
+        {/* Secondary nav */}
+        <ul className="space-y-1">
+          {secondaryNav.map((item) => (
             <li key={item.href}>
               <NavLink
                 item={item}

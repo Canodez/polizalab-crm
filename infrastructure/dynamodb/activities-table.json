@@ -1,0 +1,125 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "PolizaLab CRM — Activities DynamoDB table with GSIs for multi-attribute lookups. Composite primary key: tenantId (PK) + activityId (SK) mirrors the Clients, Policies, and Leads table pattern.",
+
+  "Parameters": {
+    "Environment": {
+      "Type": "String",
+      "Default": "dev",
+      "AllowedValues": ["dev", "stage", "prod"],
+      "Description": "Deployment environment"
+    }
+  },
+
+  "Resources": {
+    "ActivitiesTable": {
+      "Type": "AWS::DynamoDB::Table",
+
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+
+      "Properties": {
+        "TableName": {
+          "Fn::Sub": "Activities-${Environment}"
+        },
+
+        "BillingMode": "PAY_PER_REQUEST",
+
+        "AttributeDefinitions": [
+          { "AttributeName": "tenantId",            "AttributeType": "S" },
+          { "AttributeName": "activityId",          "AttributeType": "S" },
+          { "AttributeName": "assignedToUserId",    "AttributeType": "S" },
+          { "AttributeName": "dueDate",             "AttributeType": "S" },
+          { "AttributeName": "entityType_entityId", "AttributeType": "S" },
+          { "AttributeName": "createdAt",           "AttributeType": "S" },
+          { "AttributeName": "scheduledAt",         "AttributeType": "S" },
+          { "AttributeName": "status",              "AttributeType": "S" }
+        ],
+
+        "KeySchema": [
+          { "AttributeName": "tenantId",    "KeyType": "HASH" },
+          { "AttributeName": "activityId",  "KeyType": "RANGE" }
+        ],
+
+        "GlobalSecondaryIndexes": [
+          {
+            "IndexName": "assignedTo-dueDate-index",
+            "KeySchema": [
+              { "AttributeName": "assignedToUserId", "KeyType": "HASH" },
+              { "AttributeName": "dueDate",          "KeyType": "RANGE" }
+            ],
+            "Projection": {
+              "ProjectionType": "ALL"
+            }
+          },
+
+          {
+            "IndexName": "entity-index",
+            "KeySchema": [
+              { "AttributeName": "entityType_entityId", "KeyType": "HASH" },
+              { "AttributeName": "createdAt",           "KeyType": "RANGE" }
+            ],
+            "Projection": {
+              "ProjectionType": "ALL"
+            }
+          },
+
+          {
+            "IndexName": "assignedTo-scheduledAt-index",
+            "KeySchema": [
+              { "AttributeName": "assignedToUserId", "KeyType": "HASH" },
+              { "AttributeName": "scheduledAt",      "KeyType": "RANGE" }
+            ],
+            "Projection": {
+              "ProjectionType": "ALL"
+            }
+          },
+
+          {
+            "IndexName": "tenantId-status-index",
+            "KeySchema": [
+              { "AttributeName": "tenantId", "KeyType": "HASH" },
+              { "AttributeName": "status",   "KeyType": "RANGE" }
+            ],
+            "Projection": {
+              "ProjectionType": "INCLUDE",
+              "NonKeyAttributes": ["activityId", "assignedToUserId", "dueDate", "tipoCodigo", "entityType", "entityId", "createdAt"]
+            }
+          }
+        ],
+
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+
+        "SSESpecification": {
+          "SSEEnabled": true
+        },
+
+        "Tags": [
+          { "Key": "Project",     "Value": "PolizaLab" },
+          { "Key": "Feature",     "Value": "Activities" },
+          { "Key": "Environment", "Value": { "Ref": "Environment" } },
+          { "Key": "ManagedBy",   "Value": "CloudFormation" }
+        ]
+      }
+    }
+  },
+
+  "Outputs": {
+    "TableName": {
+      "Description": "Name of the Activities DynamoDB table",
+      "Value": { "Ref": "ActivitiesTable" },
+      "Export": {
+        "Name": { "Fn::Sub": "PolizaLab-ActivitiesTableName-${Environment}" }
+      }
+    },
+    "TableArn": {
+      "Description": "ARN of the Activities DynamoDB table",
+      "Value": { "Fn::GetAtt": ["ActivitiesTable", "Arn"] },
+      "Export": {
+        "Name": { "Fn::Sub": "PolizaLab-ActivitiesTableArn-${Environment}" }
+      }
+    }
+  }
+}

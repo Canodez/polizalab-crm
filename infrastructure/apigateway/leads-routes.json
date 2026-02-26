@@ -1,0 +1,63 @@
+{
+  "_comment": "API Gateway HTTP API route definitions for the Leads feature. These routes are ADDED to the existing HTTP API (id: f34orvshp5). All routes require the Cognito JWT authorizer already configured on the API. The deploy-leads.sh script reads this file and calls aws apigatewayv2 create-route / create-integration for each entry.",
+
+  "apiId": "f34orvshp5",
+  "region": "us-east-1",
+  "accountId": "584876396768",
+
+  "authorizerId": "${COGNITO_AUTHORIZER_ID}",
+  "authorizationType": "JWT",
+
+  "integrationDefaults": {
+    "integrationType": "AWS_PROXY",
+    "integrationSubtype": null,
+    "payloadFormatVersion": "2.0",
+    "timeoutInMillis": 30000,
+    "description": "lead-handler Lambda proxy integration"
+  },
+
+  "routes": [
+    {
+      "routeKey": "GET /leads",
+      "description": "List all leads for the authenticated tenant",
+      "operationName": "ListLeads",
+      "target": "polizalab-lead-handler"
+    },
+    {
+      "routeKey": "GET /leads/{leadId}",
+      "description": "Retrieve a single lead record by ID",
+      "operationName": "GetLead",
+      "target": "polizalab-lead-handler"
+    },
+    {
+      "routeKey": "POST /leads",
+      "description": "Create a new lead record",
+      "operationName": "CreateLead",
+      "target": "polizalab-lead-handler"
+    },
+    {
+      "routeKey": "PATCH /leads/{leadId}",
+      "description": "Partially update fields on an existing lead record",
+      "operationName": "UpdateLead",
+      "target": "polizalab-lead-handler"
+    },
+    {
+      "routeKey": "POST /leads/{leadId}/log-contact",
+      "description": "Append a contact-log entry to a lead (call, email, WhatsApp, etc.)",
+      "operationName": "LogLeadContact",
+      "target": "polizalab-lead-handler"
+    },
+    {
+      "routeKey": "POST /leads/{leadId}/convert",
+      "description": "Convert a qualified lead into a full Client record and mark lead as CONVERTED",
+      "operationName": "ConvertLead",
+      "target": "polizalab-lead-handler"
+    },
+    {
+      "routeKey": "DELETE /leads/{leadId}",
+      "description": "Permanently delete a lead record",
+      "operationName": "DeleteLead",
+      "target": "polizalab-lead-handler"
+    }
+  ]
+}

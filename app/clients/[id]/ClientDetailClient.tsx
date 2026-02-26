@@ -25,6 +25,7 @@ import { Policy } from '@/lib/api/policiesApi';
 import { useDirtyFormGuard } from '@/lib/hooks/useDirtyFormGuard';
 import { showSuccess, showError } from '@/lib/toast';
 import AccountCard from '@/components/account/AccountCard';
+import ActivityTimeline from '@/components/activities/ActivityTimeline';
 
 // ── Validation helpers ──────────────────────────────────────────────────────
 
@@ -696,6 +697,20 @@ export default function ClientDetailClient() {
               </div>
             )}
           </AccountCard>
+
+          {/* Activity timeline */}
+          <AccountCard title="Actividades">
+            <ActivityTimeline entityType="CLIENT" entityId={clientId} />
+          </AccountCard>
+
+          {/* Create opportunity */}
+          <Link
+            href={`/oportunidades/nueva?clientId=${clientId}&entityName=${encodeURIComponent(fullName)}`}
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-indigo-200 px-4 py-3 text-sm font-medium text-indigo-700 hover:bg-indigo-50 transition-colors"
+            style={{ minHeight: '44px' }}
+          >
+            Crear oportunidad
+          </Link>
         </>
       )}
 

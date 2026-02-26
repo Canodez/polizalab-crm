@@ -1,0 +1,39 @@
+{
+  "_comment": "API Gateway HTTP API route definitions for the Activity Types feature. These routes are ADDED to the existing HTTP API (id: f34orvshp5). All routes require the Cognito JWT authorizer already configured on the API. The deploy-activity-types.sh script reads this file and calls aws apigatewayv2 create-route / create-integration for each entry.",
+
+  "apiId": "f34orvshp5",
+  "region": "us-east-1",
+  "accountId": "584876396768",
+
+  "authorizerId": "${COGNITO_AUTHORIZER_ID}",
+  "authorizationType": "JWT",
+
+  "integrationDefaults": {
+    "integrationType": "AWS_PROXY",
+    "integrationSubtype": null,
+    "payloadFormatVersion": "2.0",
+    "timeoutInMillis": 30000,
+    "description": "activity-type-handler Lambda proxy integration"
+  },
+
+  "routes": [
+    {
+      "routeKey": "GET /activity-types",
+      "description": "List all activity types for the authenticated tenant, merging system catalog with tenant overrides",
+      "operationName": "ListActivityTypes",
+      "target": "polizalab-activity-type-handler"
+    },
+    {
+      "routeKey": "PATCH /activity-types/{code}",
+      "description": "Partially update a tenant-level override for a specific activity type by code",
+      "operationName": "UpdateActivityType",
+      "target": "polizalab-activity-type-handler"
+    },
+    {
+      "routeKey": "POST /activity-types/reorder",
+      "description": "Persist a new display order for the tenant's activity types catalog",
+      "operationName": "ReorderActivityTypes",
+      "target": "polizalab-activity-type-handler"
+    }
+  ]
+}

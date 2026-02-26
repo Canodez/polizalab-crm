@@ -1,0 +1,50 @@
+{
+  "_comment": "Lambda function configuration for polizalab-lead-handler. Mirrors the runtime and patterns used by client-handler (Python 3.12, handler.handler). The deploy-leads.sh script reads this file to create or update the function.",
+
+  "functionName": "polizalab-lead-handler",
+  "description": "Handles all CRUD operations for the Leads feature of PolizaLab CRM. Manages lead creation, updates, contact logging, duplicate detection, and conversion to Client.",
+
+  "runtime": "python3.12",
+  "handler": "handler.handler",
+  "memorySize": 256,
+  "timeout": 30,
+
+  "architectures": ["x86_64"],
+
+  "packageType": "Zip",
+  "codeS3Bucket": "${ARTIFACTS_BUCKET}",
+  "codeS3Key": "${ARTIFACTS_KEY}",
+
+  "environment": {
+    "Variables": {
+      "LEADS_TABLE":      "Leads",
+      "CLIENTS_TABLE":    "Clients",
+      "POLICIES_TABLE":   "Policies",
+      "ACTIVITIES_TABLE": "Activities",
+      "TENANT_ID":        "default",
+      "ALLOWED_ORIGIN":   "https://crm.antesdefirmar.org",
+      "LOG_LEVEL":        "INFO"
+    }
+  },
+
+  "tracingConfig": {
+    "Mode": "Active"
+  },
+
+  "reservedConcurrentExecutions": 50,
+
+  "layers": [],
+
+  "loggingConfig": {
+    "logFormat": "JSON",
+    "applicationLogLevel": "INFO",
+    "systemLogLevel": "WARN",
+    "logGroup": "/aws/lambda/polizalab-lead-handler"
+  },
+
+  "tags": {
+    "Project":     "PolizaLab",
+    "Feature":     "Leads",
+    "ManagedBy":   "deploy-leads.sh"
+  }
+}
